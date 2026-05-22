@@ -1,0 +1,7 @@
+.DS_Store
+src/.DS_Store
+.tools/
+*.rbxl
+*.rbxlx
+*.rbxm
+*.rbxmx

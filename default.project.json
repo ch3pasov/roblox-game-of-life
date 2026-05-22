@@ -1,0 +1,21 @@
+{
+  "name": "RobloxGamePrototype",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedFirst": {
+      "$className": "ReplicatedFirst",
+      "GameOfLife": {
+        "$path": "src/ReplicatedFirst/GameOfLife.client.lua"
+      }
+    },
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "GridPrototype": {
+        "$path": "src/ServerScriptService/GridPrototype.server.lua"
+      }
+    },
+    "Workspace": {
+      "$className": "Workspace"
+    }
+  }
+}
