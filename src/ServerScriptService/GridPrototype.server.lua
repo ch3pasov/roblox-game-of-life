@@ -6,6 +6,7 @@ local Workspace = game:GetService("Workspace")
 local namesToDelete = {
 	Board2D = true,
 	Board2D_v05 = true,
+	Board2D_v06 = true,
 	BoardCamera = true,
 	BoardCameraStatus = true,
 	Force2D = true,
