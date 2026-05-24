@@ -3,25 +3,83 @@ local LocalizationService = game:GetService("LocalizationService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local StarterGui = game:GetService("StarterGui")
-local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
-local UI_VERSION = "Life v1.2"
+local UI_VERSION = "Life v1.4"
 
-local ROWS = 28
-local COLUMNS = 42
+local ROWS = 64
+local COLUMNS = 64
 local BOARD_MARGIN = 14
 local CELL_GAP = 1
 local RANDOM_FILL_CHANCE = 0.25
+local DEFAULT_ZOOM_INDEX = 3
+local ZOOM_LEVELS = { 9, 13, 17, 23, 31 }
 
 local WIDE_BAR_HEIGHT = 118
 local COMPACT_BAR_HEIGHT = 184
-local COMPACT_WIDTH = 760
+local COMPACT_WIDTH = 1100
 
 local SPEEDS = {
 	{ key = "slow", seconds = 0.36 },
 	{ key = "normal", seconds = 0.18 },
 	{ key = "fast", seconds = 0.08 },
+}
+
+local PATTERNS = {
+	{
+		key = "glider",
+		cells = {
+			{ 0, 1 },
+			{ 1, 2 },
+			{ 2, 0 },
+			{ 2, 1 },
+			{ 2, 2 },
+		},
+	},
+	{
+		key = "blinker",
+		cells = {
+			{ 0, 0 },
+			{ 0, 1 },
+			{ 0, 2 },
+		},
+	},
+	{
+		key = "toad",
+		cells = {
+			{ 0, 1 },
+			{ 0, 2 },
+			{ 0, 3 },
+			{ 1, 0 },
+			{ 1, 1 },
+			{ 1, 2 },
+		},
+	},
+	{
+		key = "beacon",
+		cells = {
+			{ 0, 0 },
+			{ 0, 1 },
+			{ 1, 0 },
+			{ 2, 3 },
+			{ 3, 2 },
+			{ 3, 3 },
+		},
+	},
+	{
+		key = "spaceship",
+		cells = {
+			{ 0, 1 },
+			{ 0, 4 },
+			{ 1, 0 },
+			{ 2, 0 },
+			{ 2, 4 },
+			{ 3, 0 },
+			{ 3, 1 },
+			{ 3, 2 },
+			{ 3, 3 },
+		},
+	},
 }
 
 local COLORS = {
@@ -44,11 +102,19 @@ local TEXT = {
 		next = "Next",
 		clear = "Clear",
 		random = "Random",
+		pattern = "Pattern",
+		zoomIn = "+",
+		zoomOut = "-",
 		generation = "Generation %d",
-		speed = "Speed: %s",
+		speed = "Speed: %s · Zoom: %dx",
 		slow = "Slow",
 		normal = "Normal",
 		fast = "Fast",
+		glider = "Glider",
+		blinker = "Blinker",
+		toad = "Toad",
+		beacon = "Beacon",
+		spaceship = "Ship",
 	},
 	ru = {
 		start = "Старт",
@@ -56,11 +122,19 @@ local TEXT = {
 		next = "Шаг",
 		clear = "Очистить",
 		random = "Случайно",
+		pattern = "Паттерн",
+		zoomIn = "+",
+		zoomOut = "-",
 		generation = "Поколение %d",
-		speed = "Скорость: %s",
+		speed = "Скорость: %s · Масштаб: %dx",
 		slow = "Медленно",
 		normal = "Нормально",
 		fast = "Быстро",
+		glider = "Глайдер",
+		blinker = "Мигалка",
+		toad = "Жаба",
+		beacon = "Маяк",
+		spaceship = "Корабль",
 	},
 }
 
@@ -116,12 +190,12 @@ local cells = {}
 local running = false
 local generation = 0
 local speedIndex = 2
-local currentCellSize = 8
+local patternIndex = 1
+local lastPatternKey = nil
+local zoomIndex = DEFAULT_ZOOM_INDEX
+local currentCellSize = ZOOM_LEVELS[zoomIndex]
 local currentBoardWidth = 0
 local currentBoardHeight = 0
-local painting = false
-local paintState = false
-local paintedThisGesture = {}
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -155,19 +229,33 @@ root.BorderSizePixel = 0
 root.Size = UDim2.fromScale(1, 1)
 root.Parent = screenGui
 
-local boardOuter = Instance.new("Frame")
+local boardOuter = Instance.new("ScrollingFrame")
 boardOuter.Name = "BoardOuter"
 boardOuter.BackgroundColor3 = COLORS.background
 boardOuter.BorderSizePixel = 0
+boardOuter.Active = true
+boardOuter.AutomaticCanvasSize = Enum.AutomaticSize.None
+boardOuter.CanvasPosition = Vector2.new(0, 0)
+boardOuter.ScrollBarImageColor3 = Color3.fromRGB(210, 214, 220)
+boardOuter.ScrollBarThickness = 8
+boardOuter.ScrollingDirection = Enum.ScrollingDirection.XY
 boardOuter.Parent = root
 
 local board = Instance.new("Frame")
 board.Name = "Board"
-board.AnchorPoint = Vector2.new(0.5, 0.5)
+board.AnchorPoint = Vector2.new(0, 0)
 board.BackgroundColor3 = COLORS.gridLine
 board.BorderSizePixel = 0
-board.Position = UDim2.fromScale(0.5, 0.5)
+board.Position = UDim2.fromOffset(BOARD_MARGIN, BOARD_MARGIN)
 board.Parent = boardOuter
+
+local zoomControls = Instance.new("Frame")
+zoomControls.Name = "ZoomControls"
+zoomControls.AnchorPoint = Vector2.new(1, 0)
+zoomControls.BackgroundTransparency = 1
+zoomControls.Position = UDim2.new(1, -14, 0, 14)
+zoomControls.Size = UDim2.fromOffset(116, 52)
+zoomControls.Parent = root
 
 local bottomBar = Instance.new("Frame")
 bottomBar.Name = "BottomBar"
@@ -177,11 +265,11 @@ bottomBar.Parent = root
 
 local versionLabel = Instance.new("TextLabel")
 versionLabel.Name = "VersionLabel"
-versionLabel.AnchorPoint = Vector2.new(1, 0)
+versionLabel.AnchorPoint = Vector2.new(1, 1)
 versionLabel.BackgroundTransparency = 0.25
 versionLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 versionLabel.BorderSizePixel = 0
-versionLabel.Position = UDim2.new(1, -12, 0, 12)
+versionLabel.Position = UDim2.new(1, -12, 1, -12)
 versionLabel.Size = UDim2.fromOffset(92, 24)
 versionLabel.Font = Enum.Font.GothamMedium
 versionLabel.Text = UI_VERSION
@@ -212,7 +300,7 @@ controls.Name = "Controls"
 controls.BackgroundTransparency = 1
 controls.Parent = bottomBar
 
-local function makeButton(name)
+local function makeButton(name, parent)
 	local button = Instance.new("TextButton")
 	button.Name = name
 	button.AutoButtonColor = true
@@ -221,7 +309,7 @@ local function makeButton(name)
 	button.Font = Enum.Font.GothamBold
 	button.TextColor3 = COLORS.buttonText
 	button.TextScaled = true
-	button.Parent = controls
+	button.Parent = parent or controls
 
 	local textSizeLimit = Instance.new("UITextSizeConstraint")
 	textSizeLimit.MinTextSize = 12
@@ -239,18 +327,30 @@ local startButton = makeButton("StartButton")
 local nextButton = makeButton("NextButton")
 local clearButton = makeButton("ClearButton")
 local randomButton = makeButton("RandomButton")
+local patternButton = makeButton("PatternButton")
 local speedButton = makeButton("SpeedButton")
-local buttons = { startButton, nextButton, clearButton, randomButton, speedButton }
+local buttons = { startButton, nextButton, clearButton, randomButton, patternButton, speedButton }
+
+local zoomOutButton = makeButton("ZoomOutButton", zoomControls)
+zoomOutButton.Position = UDim2.fromOffset(0, 0)
+zoomOutButton.Size = UDim2.fromOffset(52, 52)
+
+local zoomInButton = makeButton("ZoomInButton", zoomControls)
+zoomInButton.Position = UDim2.fromOffset(64, 0)
+zoomInButton.Size = UDim2.fromOffset(52, 52)
 
 local function updateLabels()
 	generationLabel.Text = string.format(t.generation, generation)
-	speedLabel.Text = string.format(t.speed, t[SPEEDS[speedIndex].key])
+	speedLabel.Text = string.format(t.speed, t[SPEEDS[speedIndex].key], zoomIndex)
 	startButton.Text = if running then t.stop else t.start
 	startButton.BackgroundColor3 = if running then COLORS.buttonActive else COLORS.button
 	nextButton.Text = t.next
 	clearButton.Text = t.clear
 	randomButton.Text = t.random
+	patternButton.Text = if lastPatternKey then t[lastPatternKey] else t.pattern
 	speedButton.Text = t[SPEEDS[speedIndex].key]
+	zoomOutButton.Text = t.zoomOut
+	zoomInButton.Text = t.zoomIn
 end
 
 local function renderCell(row, column)
@@ -309,6 +409,7 @@ end
 local function clearGrid()
 	grid = makeGrid()
 	generation = 0
+	lastPatternKey = nil
 	setRunning(false)
 	renderGrid()
 end
@@ -321,7 +422,39 @@ local function randomizeGrid()
 		end
 	end
 	generation = 0
+	lastPatternKey = nil
 	setRunning(false)
+	renderGrid()
+end
+
+local function placePattern()
+	local pattern = PATTERNS[patternIndex]
+	grid = makeGrid()
+
+	local maxRow = 0
+	local maxColumn = 0
+	for _, cell in pattern.cells do
+		maxRow = math.max(maxRow, cell[1])
+		maxColumn = math.max(maxColumn, cell[2])
+	end
+
+	local startRow = math.floor((ROWS - maxRow) / 2)
+	local startColumn = math.floor((COLUMNS - maxColumn) / 2)
+	for _, cell in pattern.cells do
+		local row = startRow + cell[1]
+		local column = startColumn + cell[2]
+		if row >= 1 and row <= ROWS and column >= 1 and column <= COLUMNS then
+			grid[row][column] = true
+		end
+	end
+
+	generation = 0
+	lastPatternKey = pattern.key
+	setRunning(false)
+	patternIndex += 1
+	if patternIndex > #PATTERNS then
+		patternIndex = 1
+	end
 	renderGrid()
 end
 
@@ -342,63 +475,19 @@ local function setCell(row, column, alive)
 	renderCell(row, column)
 end
 
-local function cellFromScreenPosition(position)
-	local localX = position.X - board.AbsolutePosition.X
-	local localY = position.Y - board.AbsolutePosition.Y
-	if localX < 0 or localY < 0 or localX > currentBoardWidth or localY > currentBoardHeight then
-		return nil, nil
-	end
-
-	local column = math.floor(localX / (currentCellSize + CELL_GAP)) + 1
-	local row = math.floor(localY / (currentCellSize + CELL_GAP)) + 1
-	if row < 1 or row > ROWS or column < 1 or column > COLUMNS then
-		return nil, nil
-	end
-
-	return row, column
-end
-
-local function paintAtPosition(position)
-	local row, column = cellFromScreenPosition(position)
-	if not row or not column then
-		return
-	end
-
-	local key = string.format("%d:%d", row, column)
-	if paintedThisGesture[key] then
-		return
-	end
-
-	paintedThisGesture[key] = true
-	setCell(row, column, paintState)
-end
-
-local function beginPaint(row, column, input)
-	painting = true
-	paintedThisGesture = {}
-	paintState = not grid[row][column]
-	setCell(row, column, paintState)
-	paintedThisGesture[string.format("%d:%d", row, column)] = true
-
-	if input then
-		paintAtPosition(input.Position)
-	end
-end
-
-local function endPaint()
-	painting = false
-	paintedThisGesture = {}
+local function toggleCell(row, column)
+	setCell(row, column, not grid[row][column])
 end
 
 local function layoutControls(isCompact, rootWidth)
 	local gap = if isCompact then 10 else 16
 	local buttonHeight = if isCompact then 44 else 54
 	local leftPadding = if isCompact then 14 else 28
-	local labelWidth = if isCompact then math.floor((rootWidth - 42) / 2) else 190
+	local labelWidth = if isCompact then rootWidth - 28 else 190
 
 	generationLabel.Position = UDim2.fromOffset(leftPadding, if isCompact then 10 else 38)
 	generationLabel.Size = UDim2.fromOffset(labelWidth, 28)
-	speedLabel.Position = UDim2.fromOffset(if isCompact then leftPadding + labelWidth + 14 else leftPadding, if isCompact then 40 else 64)
+	speedLabel.Position = UDim2.fromOffset(leftPadding, if isCompact then 40 else 64)
 	speedLabel.Size = UDim2.fromOffset(labelWidth, 28)
 
 	if isCompact then
@@ -407,13 +496,13 @@ local function layoutControls(isCompact, rootWidth)
 		controls.Size = UDim2.new(1, -28, 0, 98)
 		local controlsWidth = rootWidth - 28
 		local buttonWidth = math.floor((controlsWidth - (gap * 2)) / 3)
-		local secondRowWidth = math.floor((controlsWidth - gap) / 2)
 		local positions = {
 			{ 0, 0, buttonWidth },
 			{ buttonWidth + gap, 0, buttonWidth },
 			{ (buttonWidth + gap) * 2, 0, buttonWidth },
-			{ 0, buttonHeight + gap, secondRowWidth },
-			{ secondRowWidth + gap, buttonHeight + gap, secondRowWidth },
+			{ 0, buttonHeight + gap, buttonWidth },
+			{ buttonWidth + gap, buttonHeight + gap, buttonWidth },
+			{ (buttonWidth + gap) * 2, buttonHeight + gap, buttonWidth },
 		}
 
 		for index, button in buttons do
@@ -422,11 +511,11 @@ local function layoutControls(isCompact, rootWidth)
 			button.Size = UDim2.fromOffset(item[3], buttonHeight)
 		end
 	else
-		local controlsWidth = 790
+		local controlsWidth = 852
 		controls.AnchorPoint = Vector2.new(0.5, 0.5)
 		controls.Position = UDim2.fromScale(0.6, 0.5)
 		controls.Size = UDim2.fromOffset(controlsWidth, buttonHeight)
-		local widths = { 160, 130, 150, 165, 145 }
+		local widths = { 136, 112, 132, 150, 140, 142 }
 		local x = 0
 		for index, button in buttons do
 			button.Position = UDim2.fromOffset(x, 0)
@@ -450,15 +539,20 @@ local function layoutBoard()
 	boardOuter.Size = UDim2.new(1, 0, 1, -(bottomHeight + inset.Y))
 	bottomBar.Position = UDim2.new(0, 0, 1, -bottomHeight)
 	bottomBar.Size = UDim2.new(1, 0, 0, bottomHeight)
+	versionLabel.Position = UDim2.new(1, -12, 1, -(bottomHeight + 12))
+	zoomControls.Position = UDim2.new(1, -14, 0, inset.Y + 14)
 
-	local availableWidth = math.max(1, boardOuter.AbsoluteSize.X - (BOARD_MARGIN * 2))
-	local availableHeight = math.max(1, boardOuter.AbsoluteSize.Y - (BOARD_MARGIN * 2))
-	currentCellSize = math.floor(math.min(availableWidth / COLUMNS, availableHeight / ROWS))
-	currentCellSize = math.max(if isCompact then 7 else 8, currentCellSize)
-
+	currentCellSize = ZOOM_LEVELS[zoomIndex]
 	currentBoardWidth = (currentCellSize * COLUMNS) + (CELL_GAP * (COLUMNS - 1))
 	currentBoardHeight = (currentCellSize * ROWS) + (CELL_GAP * (ROWS - 1))
 	board.Size = UDim2.fromOffset(currentBoardWidth, currentBoardHeight)
+
+	local canvasWidth = math.max(boardOuter.AbsoluteSize.X, currentBoardWidth + (BOARD_MARGIN * 2))
+	local canvasHeight = math.max(boardOuter.AbsoluteSize.Y, currentBoardHeight + (BOARD_MARGIN * 2))
+	local boardX = math.floor((canvasWidth - currentBoardWidth) / 2)
+	local boardY = math.floor((canvasHeight - currentBoardHeight) / 2)
+	board.Position = UDim2.fromOffset(boardX, boardY)
+	boardOuter.CanvasSize = UDim2.fromOffset(canvasWidth, canvasHeight)
 
 	for row = 1, ROWS do
 		for column = 1, COLUMNS do
@@ -469,6 +563,32 @@ local function layoutBoard()
 	end
 
 	layoutControls(isCompact, rootSize.X)
+end
+
+local function setZoom(nextZoomIndex)
+	if nextZoomIndex < 1 or nextZoomIndex > #ZOOM_LEVELS or nextZoomIndex == zoomIndex then
+		return
+	end
+
+	local oldCanvasSize = boardOuter.AbsoluteCanvasSize
+	local oldViewSize = boardOuter.AbsoluteSize
+	local oldCenter = boardOuter.CanvasPosition + Vector2.new(oldViewSize.X / 2, oldViewSize.Y / 2)
+	local oldRatioX = if oldCanvasSize.X > 0 then oldCenter.X / oldCanvasSize.X else 0.5
+	local oldRatioY = if oldCanvasSize.Y > 0 then oldCenter.Y / oldCanvasSize.Y else 0.5
+
+	zoomIndex = nextZoomIndex
+	layoutBoard()
+	updateLabels()
+
+	task.defer(function()
+		local newCanvasSize = boardOuter.AbsoluteCanvasSize
+		local newViewSize = boardOuter.AbsoluteSize
+		local targetX = (newCanvasSize.X * oldRatioX) - (newViewSize.X / 2)
+		local targetY = (newCanvasSize.Y * oldRatioY) - (newViewSize.Y / 2)
+		local maxX = math.max(0, newCanvasSize.X - newViewSize.X)
+		local maxY = math.max(0, newCanvasSize.Y - newViewSize.Y)
+		boardOuter.CanvasPosition = Vector2.new(math.clamp(targetX, 0, maxX), math.clamp(targetY, 0, maxY))
+	end)
 end
 
 for row = 1, ROWS do
@@ -483,29 +603,11 @@ for row = 1, ROWS do
 		cell.Parent = board
 		cells[row][column] = cell
 
-		cell.InputBegan:Connect(function(input)
-			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-				beginPaint(row, column, input)
-			end
+		cell.Activated:Connect(function()
+			toggleCell(row, column)
 		end)
 	end
 end
-
-UserInputService.InputChanged:Connect(function(input)
-	if not painting then
-		return
-	end
-
-	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-		paintAtPosition(input.Position)
-	end
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-		endPaint()
-	end
-end)
 
 startButton.Activated:Connect(function()
 	setRunning(not running)
@@ -517,7 +619,14 @@ end)
 
 clearButton.Activated:Connect(clearGrid)
 randomButton.Activated:Connect(randomizeGrid)
+patternButton.Activated:Connect(placePattern)
 speedButton.Activated:Connect(cycleSpeed)
+zoomOutButton.Activated:Connect(function()
+	setZoom(zoomIndex - 1)
+end)
+zoomInButton.Activated:Connect(function()
+	setZoom(zoomIndex + 1)
+end)
 
 root:GetPropertyChangedSignal("AbsoluteSize"):Connect(layoutBoard)
 boardOuter:GetPropertyChangedSignal("AbsoluteSize"):Connect(layoutBoard)

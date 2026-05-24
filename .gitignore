@@ -1,6 +1,8 @@
 .DS_Store
 src/.DS_Store
 .tools/
+.env
+metadata/exported/
 *.rbxl
 *.rbxlx
 *.rbxm
