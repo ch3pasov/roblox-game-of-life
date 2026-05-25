@@ -1,11 +1,13 @@
 local GuiService = game:GetService("GuiService")
 local LocalizationService = game:GetService("LocalizationService")
+local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local StarterGui = game:GetService("StarterGui")
 local Workspace = game:GetService("Workspace")
 
-local UI_VERSION = "Life v1.4"
+local UI_VERSION = "Life v1.5"
 
 local ROWS = 64
 local COLUMNS = 64
@@ -14,9 +16,11 @@ local CELL_GAP = 1
 local RANDOM_FILL_CHANCE = 0.25
 local DEFAULT_ZOOM_INDEX = 3
 local ZOOM_LEVELS = { 9, 13, 17, 23, 31 }
+local DONATION_GOAL_ROBUX = 1000
+local DONATION_PRODUCT_ID = 3598443222
 
-local WIDE_BAR_HEIGHT = 118
-local COMPACT_BAR_HEIGHT = 184
+local WIDE_BAR_HEIGHT = 150
+local COMPACT_BAR_HEIGHT = 230
 local COMPACT_WIDTH = 1100
 
 local SPEEDS = {
@@ -99,6 +103,8 @@ local TEXT = {
 	en = {
 		start = "Start",
 		stop = "Stop",
+		gameTab = "Game",
+		donateTab = "Donate",
 		next = "Next",
 		clear = "Clear",
 		random = "Random",
@@ -115,10 +121,18 @@ local TEXT = {
 		toad = "Toad",
 		beacon = "Beacon",
 		spaceship = "Ship",
+		donateTitle = "Open for everyone",
+		donateBody = "Goal: 1000 Robux. When it is reached, I will cover the release fee to make this place available beyond the current 16+ limit.",
+		donateProgress = "%d / %d Robux",
+		donateButton = "Donate 1000 R$",
+		donateSetup = "Donation product is not connected yet.",
+		donateReady = "Thank you for supporting the release goal.",
 	},
 	ru = {
 		start = "Старт",
 		stop = "Стоп",
+		gameTab = "Игра",
+		donateTab = "Донат",
 		next = "Шаг",
 		clear = "Очистить",
 		random = "Случайно",
@@ -135,6 +149,12 @@ local TEXT = {
 		toad = "Жаба",
 		beacon = "Маяк",
 		spaceship = "Корабль",
+		donateTitle = "Открыть для всех",
+		donateBody = "Цель: 1000 Robux. Когда цель будет собрана, я оплачу комиссию релиза, чтобы открыть плейс не только для 16+.",
+		donateProgress = "%d / %d Robux",
+		donateButton = "Донат 1000 R$",
+		donateSetup = "Донат-продукт пока не подключен.",
+		donateReady = "Спасибо за поддержку цели релиза.",
 	},
 }
 
@@ -196,6 +216,8 @@ local zoomIndex = DEFAULT_ZOOM_INDEX
 local currentCellSize = ZOOM_LEVELS[zoomIndex]
 local currentBoardWidth = 0
 local currentBoardHeight = 0
+local activeTab = "game"
+local donationTotalRobux = 0
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -300,6 +322,11 @@ controls.Name = "Controls"
 controls.BackgroundTransparency = 1
 controls.Parent = bottomBar
 
+local tabBar = Instance.new("Frame")
+tabBar.Name = "TabBar"
+tabBar.BackgroundTransparency = 1
+tabBar.Parent = bottomBar
+
 local function makeButton(name, parent)
 	local button = Instance.new("TextButton")
 	button.Name = name
@@ -339,6 +366,77 @@ local zoomInButton = makeButton("ZoomInButton", zoomControls)
 zoomInButton.Position = UDim2.fromOffset(64, 0)
 zoomInButton.Size = UDim2.fromOffset(52, 52)
 
+local gameTabButton = makeButton("GameTabButton", tabBar)
+local donateTabButton = makeButton("DonateTabButton", tabBar)
+
+local donationPanel = Instance.new("Frame")
+donationPanel.Name = "DonationPanel"
+donationPanel.BackgroundTransparency = 1
+donationPanel.Visible = false
+donationPanel.Parent = bottomBar
+
+local donateTitleLabel = Instance.new("TextLabel")
+donateTitleLabel.Name = "DonateTitleLabel"
+donateTitleLabel.BackgroundTransparency = 1
+donateTitleLabel.Font = Enum.Font.GothamBold
+donateTitleLabel.TextColor3 = COLORS.labelText
+donateTitleLabel.TextSize = 20
+donateTitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+donateTitleLabel.Parent = donationPanel
+
+local donateBodyLabel = Instance.new("TextLabel")
+donateBodyLabel.Name = "DonateBodyLabel"
+donateBodyLabel.BackgroundTransparency = 1
+donateBodyLabel.Font = Enum.Font.GothamMedium
+donateBodyLabel.TextColor3 = COLORS.labelText
+donateBodyLabel.TextSize = 14
+donateBodyLabel.TextWrapped = true
+donateBodyLabel.TextXAlignment = Enum.TextXAlignment.Left
+donateBodyLabel.TextYAlignment = Enum.TextYAlignment.Top
+donateBodyLabel.Parent = donationPanel
+
+local donateProgressBack = Instance.new("Frame")
+donateProgressBack.Name = "DonateProgressBack"
+donateProgressBack.BackgroundColor3 = Color3.fromRGB(122, 126, 134)
+donateProgressBack.BorderSizePixel = 0
+donateProgressBack.Parent = donationPanel
+
+local donateProgressCorner = Instance.new("UICorner")
+donateProgressCorner.CornerRadius = UDim.new(0, 10)
+donateProgressCorner.Parent = donateProgressBack
+
+local donateProgressFill = Instance.new("Frame")
+donateProgressFill.Name = "DonateProgressFill"
+donateProgressFill.BackgroundColor3 = COLORS.buttonActive
+donateProgressFill.BorderSizePixel = 0
+donateProgressFill.Size = UDim2.fromScale(0, 1)
+donateProgressFill.Parent = donateProgressBack
+
+local donateProgressFillCorner = Instance.new("UICorner")
+donateProgressFillCorner.CornerRadius = UDim.new(0, 10)
+donateProgressFillCorner.Parent = donateProgressFill
+
+local donateProgressLabel = Instance.new("TextLabel")
+donateProgressLabel.Name = "DonateProgressLabel"
+donateProgressLabel.BackgroundTransparency = 1
+donateProgressLabel.Font = Enum.Font.GothamBold
+donateProgressLabel.TextColor3 = COLORS.buttonText
+donateProgressLabel.TextSize = 14
+donateProgressLabel.Parent = donateProgressBack
+
+local donateButton = makeButton("DonateButton", donationPanel)
+
+local donateStatusLabel = Instance.new("TextLabel")
+donateStatusLabel.Name = "DonateStatusLabel"
+donateStatusLabel.BackgroundTransparency = 1
+donateStatusLabel.Font = Enum.Font.GothamMedium
+donateStatusLabel.TextColor3 = COLORS.labelText
+donateStatusLabel.TextSize = 13
+donateStatusLabel.TextWrapped = true
+donateStatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+donateStatusLabel.TextYAlignment = Enum.TextYAlignment.Top
+donateStatusLabel.Parent = donationPanel
+
 local function updateLabels()
 	generationLabel.Text = string.format(t.generation, generation)
 	speedLabel.Text = string.format(t.speed, t[SPEEDS[speedIndex].key], zoomIndex)
@@ -351,6 +449,43 @@ local function updateLabels()
 	speedButton.Text = t[SPEEDS[speedIndex].key]
 	zoomOutButton.Text = t.zoomOut
 	zoomInButton.Text = t.zoomIn
+	gameTabButton.Text = t.gameTab
+	donateTabButton.Text = t.donateTab
+	gameTabButton.BackgroundColor3 = if activeTab == "game" then COLORS.buttonActive else COLORS.button
+	donateTabButton.BackgroundColor3 = if activeTab == "donate" then COLORS.buttonActive else COLORS.button
+
+	local progress = math.clamp(donationTotalRobux / DONATION_GOAL_ROBUX, 0, 1)
+	donateTitleLabel.Text = t.donateTitle
+	donateBodyLabel.Text = t.donateBody
+	donateProgressFill.Size = UDim2.fromScale(progress, 1)
+	donateProgressLabel.Text = string.format(t.donateProgress, donationTotalRobux, DONATION_GOAL_ROBUX)
+	donateButton.Text = t.donateButton
+	donateButton.BackgroundColor3 = if DONATION_PRODUCT_ID > 0 then COLORS.buttonActive else COLORS.button
+	donateStatusLabel.Text = if DONATION_PRODUCT_ID > 0 then t.donateReady else t.donateSetup
+end
+
+local function setActiveTab(tabName)
+	activeTab = tabName
+	local gameVisible = activeTab == "game"
+	generationLabel.Visible = gameVisible
+	speedLabel.Visible = gameVisible
+	controls.Visible = gameVisible
+	donationPanel.Visible = not gameVisible
+	updateLabels()
+end
+
+local function bindDonationTotal()
+	local donationTotalValue = ReplicatedStorage:FindFirstChild("DonationTotalRobux")
+	if not donationTotalValue then
+		return
+	end
+
+	donationTotalRobux = donationTotalValue.Value
+	updateLabels()
+	donationTotalValue:GetPropertyChangedSignal("Value"):Connect(function()
+		donationTotalRobux = donationTotalValue.Value
+		updateLabels()
+	end)
 end
 
 local function renderCell(row, column)
@@ -484,15 +619,24 @@ local function layoutControls(isCompact, rootWidth)
 	local buttonHeight = if isCompact then 44 else 54
 	local leftPadding = if isCompact then 14 else 28
 	local labelWidth = if isCompact then rootWidth - 28 else 190
+	local tabHeight = if isCompact then 36 else 38
+	local tabWidth = if isCompact then math.floor((rootWidth - 38) / 2) else 132
 
-	generationLabel.Position = UDim2.fromOffset(leftPadding, if isCompact then 10 else 38)
+	tabBar.Position = UDim2.fromOffset(leftPadding, if isCompact then 10 else 16)
+	tabBar.Size = UDim2.fromOffset((tabWidth * 2) + gap, tabHeight)
+	gameTabButton.Position = UDim2.fromOffset(0, 0)
+	gameTabButton.Size = UDim2.fromOffset(tabWidth, tabHeight)
+	donateTabButton.Position = UDim2.fromOffset(tabWidth + gap, 0)
+	donateTabButton.Size = UDim2.fromOffset(tabWidth, tabHeight)
+
+	generationLabel.Position = UDim2.fromOffset(leftPadding, if isCompact then 54 else 62)
 	generationLabel.Size = UDim2.fromOffset(labelWidth, 28)
-	speedLabel.Position = UDim2.fromOffset(leftPadding, if isCompact then 40 else 64)
+	speedLabel.Position = UDim2.fromOffset(leftPadding, if isCompact then 82 else 90)
 	speedLabel.Size = UDim2.fromOffset(labelWidth, 28)
 
 	if isCompact then
 		controls.AnchorPoint = Vector2.new(0, 0)
-		controls.Position = UDim2.fromOffset(14, 74)
+		controls.Position = UDim2.fromOffset(14, 120)
 		controls.Size = UDim2.new(1, -28, 0, 98)
 		local controlsWidth = rootWidth - 28
 		local buttonWidth = math.floor((controlsWidth - (gap * 2)) / 3)
@@ -510,10 +654,23 @@ local function layoutControls(isCompact, rootWidth)
 			button.Position = UDim2.fromOffset(item[1], item[2])
 			button.Size = UDim2.fromOffset(item[3], buttonHeight)
 		end
+
+		donationPanel.Position = UDim2.fromOffset(14, 56)
+		donationPanel.Size = UDim2.new(1, -28, 0, 160)
+		donateTitleLabel.Position = UDim2.fromOffset(0, 0)
+		donateTitleLabel.Size = UDim2.new(1, 0, 0, 24)
+		donateBodyLabel.Position = UDim2.fromOffset(0, 28)
+		donateBodyLabel.Size = UDim2.new(1, 0, 0, 48)
+		donateProgressBack.Position = UDim2.fromOffset(0, 82)
+		donateProgressBack.Size = UDim2.new(1, 0, 0, 24)
+		donateButton.Position = UDim2.fromOffset(0, 118)
+		donateButton.Size = UDim2.new(0.44, -5, 0, 42)
+		donateStatusLabel.Position = UDim2.new(0.44, 10, 0, 116)
+		donateStatusLabel.Size = UDim2.new(0.56, -10, 0, 44)
 	else
 		local controlsWidth = 852
 		controls.AnchorPoint = Vector2.new(0.5, 0.5)
-		controls.Position = UDim2.fromScale(0.6, 0.5)
+		controls.Position = UDim2.fromScale(0.61, 0.62)
 		controls.Size = UDim2.fromOffset(controlsWidth, buttonHeight)
 		local widths = { 136, 112, 132, 150, 140, 142 }
 		local x = 0
@@ -522,6 +679,19 @@ local function layoutControls(isCompact, rootWidth)
 			button.Size = UDim2.fromOffset(widths[index], buttonHeight)
 			x += widths[index] + gap
 		end
+
+		donationPanel.Position = UDim2.fromOffset(300, 20)
+		donationPanel.Size = UDim2.new(1, -328, 1, -36)
+		donateTitleLabel.Position = UDim2.fromOffset(0, 0)
+		donateTitleLabel.Size = UDim2.fromOffset(260, 28)
+		donateBodyLabel.Position = UDim2.fromOffset(0, 34)
+		donateBodyLabel.Size = UDim2.new(0.46, -12, 0, 64)
+		donateProgressBack.Position = UDim2.new(0.46, 12, 0, 14)
+		donateProgressBack.Size = UDim2.new(0.32, -24, 0, 28)
+		donateButton.Position = UDim2.new(0.78, 0, 0, 0)
+		donateButton.Size = UDim2.new(0.22, 0, 0, 54)
+		donateStatusLabel.Position = UDim2.new(0.46, 12, 0, 52)
+		donateStatusLabel.Size = UDim2.new(0.54, -12, 0, 48)
 	end
 end
 
@@ -609,6 +779,22 @@ for row = 1, ROWS do
 	end
 end
 
+gameTabButton.Activated:Connect(function()
+	setActiveTab("game")
+end)
+
+donateTabButton.Activated:Connect(function()
+	setActiveTab("donate")
+end)
+
+donateButton.Activated:Connect(function()
+	if DONATION_PRODUCT_ID <= 0 then
+		return
+	end
+
+	MarketplaceService:PromptProductPurchase(player, DONATION_PRODUCT_ID)
+end)
+
 startButton.Activated:Connect(function()
 	setRunning(not running)
 end)
@@ -631,6 +817,8 @@ end)
 root:GetPropertyChangedSignal("AbsoluteSize"):Connect(layoutBoard)
 boardOuter:GetPropertyChangedSignal("AbsoluteSize"):Connect(layoutBoard)
 
+bindDonationTotal()
+setActiveTab("game")
 layoutBoard()
 renderGrid()
 

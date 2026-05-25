@@ -12,6 +12,8 @@ This project can export and update Roblox experience metadata through Roblox Ope
    - `universe-places:write`
    - `asset:read`
    - `asset:write`
+   - `developer-product:read`
+   - `developer-product:write`
 4. Copy `.env.example` to `.env`.
 5. Put the key into `.env` as `ROBLOX_API_KEY=...`.
 

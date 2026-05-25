@@ -12,6 +12,9 @@
       "$className": "ServerScriptService",
       "GridPrototype": {
         "$path": "src/ServerScriptService/GridPrototype.server.lua"
+      },
+      "DonationReceipts": {
+        "$path": "src/ServerScriptService/DonationReceipts.server.lua"
       }
     },
     "Workspace": {
