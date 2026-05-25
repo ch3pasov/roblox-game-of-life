@@ -315,16 +315,46 @@ export async function updateDeveloperProduct({ universeId, productId, name, desc
   });
 }
 
+function developerProductPrice(product) {
+  const info = product?.priceInformation ?? {};
+  return info.defaultPriceInRobux ?? info.priceInRobux ?? info.price ?? null;
+}
+
+function developerProductMatches(product, { name, price }) {
+  return product?.name === name
+    && developerProductPrice(product) === price
+    && product?.isForSale === true;
+}
+
+function isRateLimitError(error) {
+  return /\(429\)/.test(error?.message ?? "");
+}
+
 export async function ensureDonationProduct({ universeId, productId = null, name, description, price }) {
   if (productId) {
-    await updateDeveloperProduct({ universeId, productId, name, description, price, isForSale: true });
+    const existing = await getDeveloperProduct({ universeId, productId });
+    if (developerProductMatches(existing, { name, price })) return existing;
+
+    try {
+      await updateDeveloperProduct({ universeId, productId, name, description, price, isForSale: true });
+    } catch (error) {
+      if (!isRateLimitError(error)) throw error;
+      return existing;
+    }
+
     return getDeveloperProduct({ universeId, productId });
   }
 
   const products = await listDeveloperProducts({ universeId });
   const existing = products.developerProducts?.find((product) => product.name === name);
   if (existing) {
-    await updateDeveloperProduct({ universeId, productId: existing.productId, name, description, price, isForSale: true });
+    if (developerProductMatches(existing, { name, price })) return existing;
+    try {
+      await updateDeveloperProduct({ universeId, productId: existing.productId, name, description, price, isForSale: true });
+    } catch (error) {
+      if (!isRateLimitError(error)) throw error;
+      return existing;
+    }
     return getDeveloperProduct({ universeId, productId: existing.productId });
   }
 
