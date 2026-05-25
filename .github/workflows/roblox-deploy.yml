@@ -78,7 +78,7 @@ jobs:
 
       - name: Ensure donation products
         if: ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch') && env.ROBLOX_API_KEY != '' }}
-        run: node scripts/roblox-donation-product.mjs ensure
+        run: node scripts/roblox-donation-product.mjs ensure || echo "::warning::Donation product sync failed; continuing because existing product IDs are baked into the game."
 
       - name: Publish Roblox place
         if: ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch') && env.ROBLOX_API_KEY != '' }}
