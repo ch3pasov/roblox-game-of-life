@@ -84,6 +84,30 @@ node scripts/roblox-donation-product.mjs ensure
 
 Shared Roblox Open Cloud helpers live in `scripts/lib/roblox-open-cloud.mjs`.
 
+## GitHub Actions
+
+The repository includes `.github/workflows/roblox-deploy.yml`.
+
+The workflow runs on pull requests and pushes. On every run it:
+
+- installs Rojo;
+- checks the Node.js scripts;
+- runs `rojo sourcemap`;
+- builds `build/game-of-life.rbxl`;
+- uploads the place file as an artifact.
+
+On push to `main`, if the repository secret `ROBLOX_API_KEY` is present, it also:
+
+- applies Roblox metadata;
+- ensures donation products;
+- publishes the built place.
+
+Create the secret in GitHub:
+
+`Settings -> Secrets and variables -> Actions -> New repository secret`
+
+Use the same key permissions listed above.
+
 ## Donation total
 
 Read the current donation total from DataStore:

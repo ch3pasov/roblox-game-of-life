@@ -1,0 +1,83 @@
+name: Roblox Deploy
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    env:
+      ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install Rojo
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/rojo"
+          ASSET_URL="$(node <<'NODE'
+          const release = await fetch("https://api.github.com/repos/rojo-rbx/rojo/releases/latest").then((response) => response.json());
+          const asset = release.assets.find((item) => /linux/i.test(item.name) && /x86_64|amd64/i.test(item.name) && item.name.endsWith(".zip"));
+          if (!asset) {
+            console.error("Could not find a Linux x86_64 Rojo release asset.");
+            process.exit(1);
+          }
+          console.log(asset.browser_download_url);
+          NODE
+          )"
+          curl -L "$ASSET_URL" -o "$RUNNER_TEMP/rojo/rojo.zip"
+          unzip -q "$RUNNER_TEMP/rojo/rojo.zip" -d "$RUNNER_TEMP/rojo"
+          ROJO_BIN="$(find "$RUNNER_TEMP/rojo" -type f -name rojo | head -n 1)"
+          if [ -z "$ROJO_BIN" ]; then
+            echo "Rojo binary was not found after unzip."
+            find "$RUNNER_TEMP/rojo" -maxdepth 3 -type f
+            exit 1
+          fi
+          chmod +x "$ROJO_BIN"
+          ln -sf "$ROJO_BIN" "$RUNNER_TEMP/rojo/rojo"
+          echo "$RUNNER_TEMP/rojo" >> "$GITHUB_PATH"
+
+      - name: Check scripts
+        run: |
+          node --check scripts/lib/roblox-open-cloud.mjs
+          node --check scripts/roblox-metadata.mjs
+          node --check scripts/roblox-publish.mjs
+          node --check scripts/roblox-donation-product.mjs
+          node --check scripts/roblox-donation-total.mjs
+
+      - name: Check Rojo project map
+        run: rojo sourcemap default.project.json
+
+      - name: Build Roblox place
+        run: node scripts/roblox-publish.mjs build
+
+      - name: Upload place artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: game-of-life-place
+          path: build/game-of-life.rbxl
+          if-no-files-found: error
+
+      - name: Apply Roblox metadata
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && env.ROBLOX_API_KEY != '' }}
+        run: node scripts/roblox-metadata.mjs apply
+
+      - name: Ensure donation products
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && env.ROBLOX_API_KEY != '' }}
+        run: node scripts/roblox-donation-product.mjs ensure
+
+      - name: Publish Roblox place
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && env.ROBLOX_API_KEY != '' }}
+        run: node scripts/roblox-publish.mjs publish --output=build/game-of-life.rbxl

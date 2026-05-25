@@ -62,6 +62,31 @@ node scripts/roblox-donation-total.mjs
 
 Общая обертка над Roblox Open Cloud лежит в `scripts/lib/roblox-open-cloud.mjs`.
 
+## GitHub Actions deploy
+
+В репозитории есть workflow `.github/workflows/roblox-deploy.yml`.
+
+Он делает:
+
+- проверку Node.js-скриптов;
+- установку Rojo на GitHub runner;
+- `rojo sourcemap`;
+- сборку `build/game-of-life.rbxl`;
+- загрузку `.rbxl` как GitHub Actions artifact;
+- на push в `main` применяет Roblox metadata, проверяет донатные продукты и публикует place.
+
+Чтобы деплой в Roblox работал из GitHub, добавь secret:
+
+`Settings -> Secrets and variables -> Actions -> New repository secret`
+
+Имя:
+
+```text
+ROBLOX_API_KEY
+```
+
+Значение: Roblox Open Cloud API key с теми же правами, что лежит локально в `.env`.
+
 ## Донат-продукт
 
 Developer Product для цели доната:
