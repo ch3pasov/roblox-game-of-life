@@ -12,6 +12,7 @@ local DONATION_PRODUCTS = {
 local DONATION_TOTAL_KEY = "DonationTotalRobux"
 
 local donationStore = DataStoreService:GetDataStore("LifeGridDonations")
+local receiptStore = DataStoreService:GetDataStore("LifeGridDonationReceipts")
 
 local donationTotalValue = Instance.new("IntValue")
 donationTotalValue.Name = "DonationTotalRobux"
@@ -36,11 +37,39 @@ MarketplaceService.ProcessReceipt = function(receiptInfo)
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
 
+	local receiptKey = tostring(receiptInfo.PurchaseId)
+	local receiptSuccess, alreadyProcessed = pcall(function()
+		return receiptStore:GetAsync(receiptKey)
+	end)
+
+	if not receiptSuccess then
+		return Enum.ProductPurchaseDecision.NotProcessedYet
+	end
+
+	if alreadyProcessed then
+		refreshDonationTotal()
+		return Enum.ProductPurchaseDecision.PurchaseGranted
+	end
+
 	local success, total = pcall(function()
 		return donationStore:IncrementAsync(DONATION_TOTAL_KEY, donationAmount)
 	end)
 
 	if not success then
+		return Enum.ProductPurchaseDecision.NotProcessedYet
+	end
+
+	local markSuccess = pcall(function()
+		receiptStore:SetAsync(receiptKey, {
+			amount = donationAmount,
+			playerId = receiptInfo.PlayerId,
+			productId = receiptInfo.ProductId,
+			total = total,
+			processedAt = os.time(),
+		})
+	end)
+
+	if not markSuccess then
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
 

@@ -14,6 +14,7 @@ This project can export and update Roblox experience metadata through Roblox Ope
    - `asset:write`
    - `developer-product:read`
    - `developer-product:write`
+   - `universe-datastores.objects:read`
 4. Copy `.env.example` to `.env`.
 5. Put the key into `.env` as `ROBLOX_API_KEY=...`.
 
@@ -82,3 +83,13 @@ node scripts/roblox-donation-product.mjs ensure
 ```
 
 Shared Roblox Open Cloud helpers live in `scripts/lib/roblox-open-cloud.mjs`.
+
+## Donation total
+
+Read the current donation total from DataStore:
+
+```sh
+node scripts/roblox-donation-total.mjs
+```
+
+This command needs the `universe-datastores.objects:read` Open Cloud scope.

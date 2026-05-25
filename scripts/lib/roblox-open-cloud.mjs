@@ -332,3 +332,15 @@ export async function ensureDonationProduct({ universeId, productId = null, name
   await updateDeveloperProduct({ universeId, productId: created.productId, name, description, price, isForSale: true });
   return getDeveloperProduct({ universeId, productId: created.productId });
 }
+
+export async function getDataStoreEntry({ universeId, datastoreName, entryKey, scope = "global" }) {
+  const search = new URLSearchParams({
+    datastoreName,
+    entryKey,
+    scope
+  });
+
+  return robloxRequest("Get data store entry", `https://apis.roblox.com/datastores/v1/universes/${universeId}/standard-datastores/datastore/entries/entry?${search.toString()}`, {
+    headers: apiHeaders()
+  });
+}

@@ -8,7 +8,7 @@ local SoundService = game:GetService("SoundService")
 local StarterGui = game:GetService("StarterGui")
 local Workspace = game:GetService("Workspace")
 
-local UI_VERSION = "Life v1.8"
+local UI_VERSION = "Life v1.9"
 
 local ROWS = 64
 local COLUMNS = 64
@@ -534,18 +534,58 @@ local function setActiveTab(tabName)
 end
 
 local function bindDonationTotal()
-	local donationTotalValue = ReplicatedStorage:FindFirstChild("DonationTotalRobux")
-	if not donationTotalValue then
+	task.spawn(function()
+		local donationTotalValue = ReplicatedStorage:WaitForChild("DonationTotalRobux", 15)
+		if not donationTotalValue then
+			return
+		end
+
+		donationTotalRobux = donationTotalValue.Value
+		updateLabels()
+		donationTotalValue:GetPropertyChangedSignal("Value"):Connect(function()
+			donationTotalRobux = donationTotalValue.Value
+			updateLabels()
+		end)
+	end)
+end
+
+local function pollDonationTotal()
+	task.spawn(function()
+		while screenGui.Parent do
+			local donationTotalValue = ReplicatedStorage:FindFirstChild("DonationTotalRobux")
+			if donationTotalValue then
+				donationTotalRobux = donationTotalValue.Value
+				updateLabels()
+			end
+			task.wait(10)
+		end
+	end)
+end
+
+local function boostDonationProgress(amount)
+	donationTotalRobux = math.min(DONATION_GOAL_ROBUX, donationTotalRobux + amount)
+	updateLabels()
+	task.delay(8, function()
+		local donationTotalValue = ReplicatedStorage:FindFirstChild("DonationTotalRobux")
+		if donationTotalValue then
+			donationTotalRobux = donationTotalValue.Value
+			updateLabels()
+		end
+	end)
+end
+
+MarketplaceService.PromptProductPurchaseFinished:Connect(function(userId, productId, wasPurchased)
+	if not wasPurchased or userId ~= player.UserId then
 		return
 	end
 
-	donationTotalRobux = donationTotalValue.Value
-	updateLabels()
-	donationTotalValue:GetPropertyChangedSignal("Value"):Connect(function()
-		donationTotalRobux = donationTotalValue.Value
-		updateLabels()
-	end)
-end
+	for _, donationProduct in DONATION_PRODUCTS do
+		if donationProduct.productId == productId then
+			boostDonationProgress(donationProduct.amount)
+			return
+		end
+	end
+end)
 
 local function renderCell(row, column)
 	local cell = cells[row][column]
@@ -943,6 +983,7 @@ root:GetPropertyChangedSignal("AbsoluteSize"):Connect(layoutBoard)
 boardOuter:GetPropertyChangedSignal("AbsoluteSize"):Connect(layoutBoard)
 
 bindDonationTotal()
+pollDonationTotal()
 setActiveTab("game")
 layoutBoard()
 renderGrid()

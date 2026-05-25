@@ -57,6 +57,7 @@ node scripts/roblox-publish.mjs deploy
 node scripts/roblox-metadata.mjs apply
 node scripts/roblox-publish.mjs deploy
 node scripts/roblox-donation-product.mjs ensure
+node scripts/roblox-donation-total.mjs
 ```
 
 Общая обертка над Roblox Open Cloud лежит в `scripts/lib/roblox-open-cloud.mjs`.
