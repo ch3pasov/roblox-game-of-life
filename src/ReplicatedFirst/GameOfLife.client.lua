@@ -8,7 +8,7 @@ local SoundService = game:GetService("SoundService")
 local StarterGui = game:GetService("StarterGui")
 local Workspace = game:GetService("Workspace")
 
-local UI_VERSION = "Life v1.9"
+local UI_VERSION = "Life v2.0"
 
 local ROWS = 64
 local COLUMNS = 64
@@ -562,10 +562,25 @@ local function pollDonationTotal()
 	end)
 end
 
-local function boostDonationProgress(amount)
-	donationTotalRobux = math.min(DONATION_GOAL_ROBUX, donationTotalRobux + amount)
-	updateLabels()
-	task.delay(8, function()
+local function syncDonationTotalFromServer()
+	local donationTotalValue = ReplicatedStorage:FindFirstChild("DonationTotalRobux")
+	if donationTotalValue then
+		donationTotalRobux = donationTotalValue.Value
+		updateLabels()
+	end
+end
+
+local function syncDonationTotalAfterPurchase()
+	task.spawn(function()
+		for _ = 1, 20 do
+			syncDonationTotalFromServer()
+			task.wait(0.5)
+		end
+	end)
+end
+
+local function markDonationPurchasePending()
+	task.delay(2, function()
 		local donationTotalValue = ReplicatedStorage:FindFirstChild("DonationTotalRobux")
 		if donationTotalValue then
 			donationTotalRobux = donationTotalValue.Value
@@ -581,7 +596,8 @@ MarketplaceService.PromptProductPurchaseFinished:Connect(function(userId, produc
 
 	for _, donationProduct in DONATION_PRODUCTS do
 		if donationProduct.productId == productId then
-			boostDonationProgress(donationProduct.amount)
+			markDonationPurchasePending()
+			syncDonationTotalAfterPurchase()
 			return
 		end
 	end
