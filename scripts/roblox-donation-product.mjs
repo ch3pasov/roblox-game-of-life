@@ -9,10 +9,21 @@ import {
   loadRobloxConfig
 } from "./lib/roblox-open-cloud.mjs";
 
-const DONATION_PRODUCT_ID = 3598443222;
-const DONATION_PRODUCT_NAME = "Open Life Grid for Everyone";
-const DONATION_PRODUCT_DESCRIPTION = "Support the goal to open Life Grid for everyone. At 1000 Robux donated, the release fee will be covered.";
-const DONATION_PRODUCT_PRICE = 1000;
+const DONATION_PRODUCTS = [
+  { productId: 3598501584, price: 10 },
+  { productId: 3598501592, price: 50 },
+  { productId: 3598501597, price: 100 },
+  { productId: 3598501604, price: 250 },
+  { productId: 3598443222, price: 1000 }
+];
+
+function productName(price) {
+  return `Life Grid donation ${price} Robux`;
+}
+
+function productDescription(price) {
+  return `Donate ${price} Robux toward opening Life Grid for everyone. At 1000 Robux donated, the release fee will be covered.`;
+}
 
 function usage() {
   console.log("Usage:");
@@ -42,15 +53,24 @@ try {
     const products = await listDeveloperProducts({ universeId });
     console.log(JSON.stringify(products.developerProducts ?? [], null, 2));
   } else if (command === "get") {
-    printProduct(await getDeveloperProduct({ universeId, productId: DONATION_PRODUCT_ID }));
+    for (const product of DONATION_PRODUCTS.filter((item) => item.productId)) {
+      printProduct(await getDeveloperProduct({ universeId, productId: product.productId }));
+    }
   } else if (command === "ensure") {
-    printProduct(await ensureDonationProduct({
-      universeId,
-      productId: DONATION_PRODUCT_ID,
-      name: DONATION_PRODUCT_NAME,
-      description: DONATION_PRODUCT_DESCRIPTION,
-      price: DONATION_PRODUCT_PRICE
-    }));
+    const ensured = [];
+    for (const product of DONATION_PRODUCTS) {
+      ensured.push(await ensureDonationProduct({
+        universeId,
+        productId: product.productId,
+        name: productName(product.price),
+        description: productDescription(product.price),
+        price: product.price
+      }));
+    }
+
+    for (const product of ensured) {
+      printProduct(product);
+    }
   } else {
     usage();
     process.exitCode = 1;

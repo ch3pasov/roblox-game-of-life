@@ -17,10 +17,16 @@ local RANDOM_FILL_CHANCE = 0.25
 local DEFAULT_ZOOM_INDEX = 3
 local ZOOM_LEVELS = { 9, 13, 17, 23, 31 }
 local DONATION_GOAL_ROBUX = 1000
-local DONATION_PRODUCT_ID = 3598443222
+local DONATION_PRODUCTS = {
+	{ amount = 10, productId = 3598501584 },
+	{ amount = 50, productId = 3598501592 },
+	{ amount = 100, productId = 3598501597 },
+	{ amount = 250, productId = 3598501604 },
+	{ amount = 1000, productId = 3598443222 },
+}
 
 local WIDE_BAR_HEIGHT = 150
-local COMPACT_BAR_HEIGHT = 230
+local COMPACT_BAR_HEIGHT = 250
 local COMPACT_WIDTH = 1100
 
 local SPEEDS = {
@@ -124,9 +130,9 @@ local TEXT = {
 		donateTitle = "Open for everyone",
 		donateBody = "Goal: 1000 Robux. When it is reached, I will cover the release fee to make this place available beyond the current 16+ limit.",
 		donateProgress = "%d / %d Robux",
-		donateButton = "Donate 1000 R$",
+		donateButton = "%d R$",
 		donateSetup = "Donation product is not connected yet.",
-		donateReady = "Thank you for supporting the release goal.",
+		donateReady = "Choose any amount to support the release goal.",
 	},
 	ru = {
 		start = "Старт",
@@ -152,9 +158,9 @@ local TEXT = {
 		donateTitle = "Открыть для всех",
 		donateBody = "Цель: 1000 Robux. Когда цель будет собрана, я оплачу комиссию релиза, чтобы открыть плейс не только для 16+.",
 		donateProgress = "%d / %d Robux",
-		donateButton = "Донат 1000 R$",
+		donateButton = "%d R$",
 		donateSetup = "Донат-продукт пока не подключен.",
-		donateReady = "Спасибо за поддержку цели релиза.",
+		donateReady = "Выбери любую сумму для поддержки цели.",
 	},
 }
 
@@ -424,7 +430,20 @@ donateProgressLabel.TextColor3 = COLORS.buttonText
 donateProgressLabel.TextSize = 14
 donateProgressLabel.Parent = donateProgressBack
 
-local donateButton = makeButton("DonateButton", donationPanel)
+local donateButtonsFrame = Instance.new("Frame")
+donateButtonsFrame.Name = "DonateButtonsFrame"
+donateButtonsFrame.BackgroundTransparency = 1
+donateButtonsFrame.Parent = donationPanel
+
+local donateButtons = {}
+for _, donationProduct in DONATION_PRODUCTS do
+	local button = makeButton(string.format("Donate%dButton", donationProduct.amount), donateButtonsFrame)
+	table.insert(donateButtons, {
+		button = button,
+		amount = donationProduct.amount,
+		productId = donationProduct.productId,
+	})
+end
 
 local donateStatusLabel = Instance.new("TextLabel")
 donateStatusLabel.Name = "DonateStatusLabel"
@@ -459,9 +478,12 @@ local function updateLabels()
 	donateBodyLabel.Text = t.donateBody
 	donateProgressFill.Size = UDim2.fromScale(progress, 1)
 	donateProgressLabel.Text = string.format(t.donateProgress, donationTotalRobux, DONATION_GOAL_ROBUX)
-	donateButton.Text = t.donateButton
-	donateButton.BackgroundColor3 = if DONATION_PRODUCT_ID > 0 then COLORS.buttonActive else COLORS.button
-	donateStatusLabel.Text = if DONATION_PRODUCT_ID > 0 then t.donateReady else t.donateSetup
+	local hasDonationProducts = #DONATION_PRODUCTS > 0
+	for _, item in donateButtons do
+		item.button.Text = string.format(t.donateButton, item.amount)
+		item.button.BackgroundColor3 = if item.productId > 0 then COLORS.buttonActive else COLORS.button
+	end
+	donateStatusLabel.Text = if hasDonationProducts then t.donateReady else t.donateSetup
 end
 
 local function setActiveTab(tabName)
@@ -663,10 +685,16 @@ local function layoutControls(isCompact, rootWidth)
 		donateBodyLabel.Size = UDim2.new(1, 0, 0, 48)
 		donateProgressBack.Position = UDim2.fromOffset(0, 82)
 		donateProgressBack.Size = UDim2.new(1, 0, 0, 24)
-		donateButton.Position = UDim2.fromOffset(0, 118)
-		donateButton.Size = UDim2.new(0.44, -5, 0, 42)
-		donateStatusLabel.Position = UDim2.new(0.44, 10, 0, 116)
-		donateStatusLabel.Size = UDim2.new(0.56, -10, 0, 44)
+		donateButtonsFrame.Position = UDim2.fromOffset(0, 116)
+		donateButtonsFrame.Size = UDim2.new(1, 0, 0, 42)
+		local smallButtonGap = 7
+		local smallButtonWidth = math.floor((rootWidth - 28 - (smallButtonGap * (#donateButtons - 1))) / #donateButtons)
+		for index, item in donateButtons do
+			item.button.Position = UDim2.fromOffset((index - 1) * (smallButtonWidth + smallButtonGap), 0)
+			item.button.Size = UDim2.fromOffset(smallButtonWidth, 42)
+		end
+		donateStatusLabel.Position = UDim2.fromOffset(0, 162)
+		donateStatusLabel.Size = UDim2.new(1, 0, 0, 34)
 	else
 		local controlsWidth = 852
 		controls.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -688,10 +716,19 @@ local function layoutControls(isCompact, rootWidth)
 		donateBodyLabel.Size = UDim2.new(0.46, -12, 0, 64)
 		donateProgressBack.Position = UDim2.new(0.46, 12, 0, 14)
 		donateProgressBack.Size = UDim2.new(0.32, -24, 0, 28)
-		donateButton.Position = UDim2.new(0.78, 0, 0, 0)
-		donateButton.Size = UDim2.new(0.22, 0, 0, 54)
+		donateButtonsFrame.Position = UDim2.new(0.78, 0, 0, 0)
+		donateButtonsFrame.Size = UDim2.new(0.22, 0, 0, 88)
+		local buttonGap = 8
+		local buttonWidth = math.floor((donateButtonsFrame.AbsoluteSize.X - buttonGap) / 2)
+		for index, item in donateButtons do
+			local zeroIndex = index - 1
+			local column = zeroIndex % 2
+			local row = math.floor(zeroIndex / 2)
+			item.button.Position = UDim2.fromOffset(column * (buttonWidth + buttonGap), row * 30)
+			item.button.Size = UDim2.fromOffset(buttonWidth, 26)
+		end
 		donateStatusLabel.Position = UDim2.new(0.46, 12, 0, 52)
-		donateStatusLabel.Size = UDim2.new(0.54, -12, 0, 48)
+		donateStatusLabel.Size = UDim2.new(0.32, -24, 0, 48)
 	end
 end
 
@@ -787,13 +824,15 @@ donateTabButton.Activated:Connect(function()
 	setActiveTab("donate")
 end)
 
-donateButton.Activated:Connect(function()
-	if DONATION_PRODUCT_ID <= 0 then
-		return
-	end
+for _, item in donateButtons do
+	item.button.Activated:Connect(function()
+		if item.productId <= 0 then
+			return
+		end
 
-	MarketplaceService:PromptProductPurchase(player, DONATION_PRODUCT_ID)
-end)
+		MarketplaceService:PromptProductPurchase(player, item.productId)
+	end)
+end
 
 startButton.Activated:Connect(function()
 	setRunning(not running)
