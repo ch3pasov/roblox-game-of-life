@@ -50,6 +50,16 @@ node scripts/roblox-publish.mjs deploy
 
 Скрипт берет `universeId` и `placeId` из `metadata/roblox-metadata.json`, а `ROBLOX_API_KEY` из `.env`.
 
+Полезные команды Roblox API:
+
+```sh
+node scripts/roblox-metadata.mjs apply
+node scripts/roblox-publish.mjs deploy
+node scripts/roblox-donation-product.mjs ensure
+```
+
+Общая обертка над Roblox Open Cloud лежит в `scripts/lib/roblox-open-cloud.mjs`.
+
 ## Донат-продукт
 
 Developer Product для цели доната:

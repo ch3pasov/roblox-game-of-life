@@ -52,3 +52,33 @@ Example thumbnail entry:
   "altText": "Conway's Game of Life grid in Roblox"
 }
 ```
+
+## Publish place
+
+Build only:
+
+```sh
+node scripts/roblox-publish.mjs build
+```
+
+Build and publish:
+
+```sh
+node scripts/roblox-publish.mjs deploy
+```
+
+## Developer product
+
+Check the donation product:
+
+```sh
+node scripts/roblox-donation-product.mjs get
+```
+
+Create or repair the donation product settings:
+
+```sh
+node scripts/roblox-donation-product.mjs ensure
+```
+
+Shared Roblox Open Cloud helpers live in `scripts/lib/roblox-open-cloud.mjs`.
