@@ -10,7 +10,7 @@ local Workspace = game:GetService("Workspace")
 
 local player = Players.LocalPlayer
 
-local UI_VERSION = "Life v2.1"
+local UI_VERSION = "Life v2.2"
 
 local ROWS = 64
 local COLUMNS = 64
@@ -508,9 +508,18 @@ local donateProgressLabel = Instance.new("TextLabel")
 donateProgressLabel.Name = "DonateProgressLabel"
 donateProgressLabel.BackgroundTransparency = 1
 donateProgressLabel.Font = Enum.Font.GothamBold
+donateProgressLabel.Position = UDim2.fromScale(0, 0)
+donateProgressLabel.Size = UDim2.fromScale(1, 1)
 donateProgressLabel.TextColor3 = COLORS.buttonText
-donateProgressLabel.TextSize = 14
+donateProgressLabel.TextScaled = true
+donateProgressLabel.TextXAlignment = Enum.TextXAlignment.Center
+donateProgressLabel.TextYAlignment = Enum.TextYAlignment.Center
 donateProgressLabel.Parent = donateProgressBack
+
+local donateProgressTextLimit = Instance.new("UITextSizeConstraint")
+donateProgressTextLimit.MinTextSize = 10
+donateProgressTextLimit.MaxTextSize = 14
+donateProgressTextLimit.Parent = donateProgressLabel
 
 local donateButtonsFrame = Instance.new("Frame")
 donateButtonsFrame.Name = "DonateButtonsFrame"
