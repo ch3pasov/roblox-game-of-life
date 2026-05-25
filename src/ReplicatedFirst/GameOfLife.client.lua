@@ -4,10 +4,11 @@ local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local SoundService = game:GetService("SoundService")
 local StarterGui = game:GetService("StarterGui")
 local Workspace = game:GetService("Workspace")
 
-local UI_VERSION = "Life v1.6"
+local UI_VERSION = "Life v1.7"
 
 local ROWS = 64
 local COLUMNS = 64
@@ -170,6 +171,24 @@ RunService:UnbindFromRenderStep("BoardCamera")
 pcall(function()
 	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, false)
 end)
+
+local function muteSound(instance)
+	if instance:IsA("Sound") then
+		instance.Volume = 0
+		instance.Playing = false
+		instance:Stop()
+	end
+end
+
+local function muteAllAudio()
+	SoundService.Volume = 0
+	for _, instance in game:GetDescendants() do
+		muteSound(instance)
+	end
+end
+
+muteAllAudio()
+game.DescendantAdded:Connect(muteSound)
 
 local function hideWorkspacePart(instance)
 	if instance:IsA("BasePart") then
@@ -928,6 +947,7 @@ end)
 task.spawn(function()
 	for _ = 1, 40 do
 		RunService:UnbindFromRenderStep("BoardCamera")
+		muteAllAudio()
 		for _, instance in Workspace:GetDescendants() do
 			hideWorkspacePart(instance)
 		end
