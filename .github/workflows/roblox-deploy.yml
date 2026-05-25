@@ -46,7 +46,9 @@ jobs:
             exit 1
           fi
           chmod +x "$ROJO_BIN"
-          ln -sf "$ROJO_BIN" "$RUNNER_TEMP/rojo/rojo"
+          if [ "$ROJO_BIN" != "$RUNNER_TEMP/rojo/rojo" ]; then
+            ln -sf "$ROJO_BIN" "$RUNNER_TEMP/rojo/rojo"
+          fi
           echo "$RUNNER_TEMP/rojo" >> "$GITHUB_PATH"
 
       - name: Check scripts
