@@ -8,7 +8,7 @@ local SoundService = game:GetService("SoundService")
 local StarterGui = game:GetService("StarterGui")
 local Workspace = game:GetService("Workspace")
 
-local UI_VERSION = "Life v1.7"
+local UI_VERSION = "Life v1.8"
 
 local ROWS = 64
 local COLUMNS = 64
@@ -174,21 +174,33 @@ end)
 
 local function muteSound(instance)
 	if instance:IsA("Sound") then
-		instance.Volume = 0
-		instance.Playing = false
-		instance:Stop()
+		pcall(function()
+			instance.Volume = 0
+			instance:Stop()
+		end)
 	end
 end
 
 local function muteAllAudio()
-	SoundService.Volume = 0
-	for _, instance in game:GetDescendants() do
-		muteSound(instance)
+	pcall(function()
+		SoundService.Volume = 0
+	end)
+
+	local success, descendants = pcall(function()
+		return game:GetDescendants()
+	end)
+
+	if success then
+		for _, instance in descendants do
+			muteSound(instance)
+		end
 	end
 end
 
-muteAllAudio()
-game.DescendantAdded:Connect(muteSound)
+task.defer(muteAllAudio)
+game.DescendantAdded:Connect(function(instance)
+	task.defer(muteSound, instance)
+end)
 
 local function hideWorkspacePart(instance)
 	if instance:IsA("BasePart") then
