@@ -8,7 +8,9 @@ local SoundService = game:GetService("SoundService")
 local StarterGui = game:GetService("StarterGui")
 local Workspace = game:GetService("Workspace")
 
-local UI_VERSION = "Life v2.0"
+local player = Players.LocalPlayer
+
+local UI_VERSION = "Life v2.1"
 
 local ROWS = 64
 local COLUMNS = 64
@@ -176,7 +178,22 @@ local function muteSound(instance)
 	if instance:IsA("Sound") then
 		pcall(function()
 			instance.Volume = 0
+			instance.PlaybackSpeed = 0
 			instance:Stop()
+		end)
+
+		instance:GetPropertyChangedSignal("Playing"):Connect(function()
+			if instance.Playing then
+				pcall(function()
+					instance.Volume = 0
+					instance.PlaybackSpeed = 0
+					instance:Stop()
+				end)
+			end
+		end)
+	elseif instance:IsA("SoundGroup") then
+		pcall(function()
+			instance.Volume = 0
 		end)
 	end
 end
@@ -184,6 +201,7 @@ end
 local function muteAllAudio()
 	pcall(function()
 		SoundService.Volume = 0
+		SoundService.AmbientReverb = Enum.ReverbType.NoReverb
 	end)
 
 	local success, descendants = pcall(function()
@@ -197,9 +215,37 @@ local function muteAllAudio()
 	end
 end
 
+local function removeRobloxCharacterSounds()
+	local playerScripts = player:FindFirstChild("PlayerScripts")
+	if playerScripts then
+		for _, child in playerScripts:GetChildren() do
+			if child.Name == "RbxCharacterSounds" or child.Name == "CharacterSounds" then
+				child:Destroy()
+			end
+		end
+	end
+
+	local character = player.Character
+	if character then
+		for _, instance in character:GetDescendants() do
+			muteSound(instance)
+			if instance:IsA("Sound") then
+				pcall(function()
+					instance:Destroy()
+				end)
+			end
+		end
+	end
+end
+
 task.defer(muteAllAudio)
+task.defer(removeRobloxCharacterSounds)
 game.DescendantAdded:Connect(function(instance)
 	task.defer(muteSound, instance)
+end)
+player.CharacterAdded:Connect(function()
+	task.defer(removeRobloxCharacterSounds)
+	task.defer(muteAllAudio)
 end)
 
 local function hideWorkspacePart(instance)
@@ -257,7 +303,6 @@ local currentBoardHeight = 0
 local activeTab = "game"
 local donationTotalRobux = 0
 
-local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 removeOldGui(playerGui)
 
@@ -1014,9 +1059,10 @@ task.spawn(function()
 end)
 
 task.spawn(function()
-	for _ = 1, 40 do
+	while screenGui.Parent do
 		RunService:UnbindFromRenderStep("BoardCamera")
 		muteAllAudio()
+		removeRobloxCharacterSounds()
 		for _, instance in Workspace:GetDescendants() do
 			hideWorkspacePart(instance)
 		end
@@ -1030,6 +1076,6 @@ task.spawn(function()
 				child:Destroy()
 			end
 		end
-		task.wait(0.25)
+		task.wait(1)
 	end
 end)
