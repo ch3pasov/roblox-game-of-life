@@ -2,6 +2,12 @@
   "name": "RobloxGamePrototype",
   "tree": {
     "$className": "DataModel",
+    "StarterGui": {
+      "$className": "StarterGui",
+      "$properties": {
+        "ScreenOrientation": "Portrait"
+      }
+    },
     "ReplicatedFirst": {
       "$className": "ReplicatedFirst",
       "GameOfLife": {

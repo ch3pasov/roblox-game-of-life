@@ -7,7 +7,7 @@ local RunService = game:GetService("RunService")
 local StarterGui = game:GetService("StarterGui")
 local Workspace = game:GetService("Workspace")
 
-local UI_VERSION = "Life v1.5"
+local UI_VERSION = "Life v1.6"
 
 local ROWS = 64
 local COLUMNS = 64
@@ -27,6 +27,7 @@ local DONATION_PRODUCTS = {
 
 local WIDE_BAR_HEIGHT = 150
 local COMPACT_BAR_HEIGHT = 250
+local COMPACT_LANDSCAPE_BAR_HEIGHT = 120
 local COMPACT_WIDTH = 1100
 
 local SPEEDS = {
@@ -228,6 +229,11 @@ local donationTotalRobux = 0
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 removeOldGui(playerGui)
+
+pcall(function()
+	playerGui.ScreenOrientation = Enum.ScreenOrientation.Portrait
+	StarterGui.ScreenOrientation = Enum.ScreenOrientation.Portrait
+end)
 
 local function makeGrid()
 	local nextGrid = {}
@@ -636,13 +642,13 @@ local function toggleCell(row, column)
 	setCell(row, column, not grid[row][column])
 end
 
-local function layoutControls(isCompact, rootWidth)
+local function layoutControls(isCompact, isLandscapeCompact, rootWidth)
 	local gap = if isCompact then 10 else 16
-	local buttonHeight = if isCompact then 44 else 54
+	local buttonHeight = if isLandscapeCompact then 34 else if isCompact then 44 else 54
 	local leftPadding = if isCompact then 14 else 28
 	local labelWidth = if isCompact then rootWidth - 28 else 190
-	local tabHeight = if isCompact then 36 else 38
-	local tabWidth = if isCompact then math.floor((rootWidth - 38) / 2) else 132
+	local tabHeight = if isLandscapeCompact then 30 else if isCompact then 36 else 38
+	local tabWidth = if isLandscapeCompact then 112 else if isCompact then math.floor((rootWidth - 38) / 2) else 132
 
 	tabBar.Position = UDim2.fromOffset(leftPadding, if isCompact then 10 else 16)
 	tabBar.Size = UDim2.fromOffset((tabWidth * 2) + gap, tabHeight)
@@ -651,12 +657,54 @@ local function layoutControls(isCompact, rootWidth)
 	donateTabButton.Position = UDim2.fromOffset(tabWidth + gap, 0)
 	donateTabButton.Size = UDim2.fromOffset(tabWidth, tabHeight)
 
-	generationLabel.Position = UDim2.fromOffset(leftPadding, if isCompact then 54 else 62)
+	generationLabel.Position = UDim2.fromOffset(leftPadding, if isLandscapeCompact then 50 else if isCompact then 54 else 62)
 	generationLabel.Size = UDim2.fromOffset(labelWidth, 28)
-	speedLabel.Position = UDim2.fromOffset(leftPadding, if isCompact then 82 else 90)
+	speedLabel.Position = UDim2.fromOffset(leftPadding, if isLandscapeCompact then 76 else if isCompact then 82 else 90)
 	speedLabel.Size = UDim2.fromOffset(labelWidth, 28)
 
-	if isCompact then
+	if isLandscapeCompact then
+		controls.AnchorPoint = Vector2.new(0, 0)
+		controls.Position = UDim2.fromOffset(270, 12)
+		controls.Size = UDim2.new(1, -284, 0, 92)
+		local controlsWidth = rootWidth - 284
+		local buttonWidth = math.floor((controlsWidth - (gap * 2)) / 3)
+		local positions = {
+			{ 0, 0, buttonWidth },
+			{ buttonWidth + gap, 0, buttonWidth },
+			{ (buttonWidth + gap) * 2, 0, buttonWidth },
+			{ 0, buttonHeight + gap, buttonWidth },
+			{ buttonWidth + gap, buttonHeight + gap, buttonWidth },
+			{ (buttonWidth + gap) * 2, buttonHeight + gap, buttonWidth },
+		}
+
+		for index, button in buttons do
+			local item = positions[index]
+			button.Position = UDim2.fromOffset(item[1], item[2])
+			button.Size = UDim2.fromOffset(item[3], buttonHeight)
+		end
+
+		donationPanel.Position = UDim2.fromOffset(270, 10)
+		donationPanel.Size = UDim2.new(1, -284, 0, 100)
+		donateTitleLabel.Position = UDim2.fromOffset(0, 0)
+		donateTitleLabel.Size = UDim2.new(0.28, -8, 0, 24)
+		donateBodyLabel.Position = UDim2.fromOffset(0, 28)
+		donateBodyLabel.Size = UDim2.new(0.28, -8, 0, 64)
+		donateProgressBack.Position = UDim2.new(0.28, 0, 0, 4)
+		donateProgressBack.Size = UDim2.new(0.32, -12, 0, 24)
+		donateButtonsFrame.Position = UDim2.new(0.6, 0, 0, 0)
+		donateButtonsFrame.Size = UDim2.new(0.4, 0, 0, 76)
+		local compactButtonGap = 7
+		local compactButtonWidth = math.floor((donateButtonsFrame.AbsoluteSize.X - compactButtonGap) / 2)
+		for index, item in donateButtons do
+			local zeroIndex = index - 1
+			local column = zeroIndex % 2
+			local row = math.floor(zeroIndex / 2)
+			item.button.Position = UDim2.fromOffset(column * (compactButtonWidth + compactButtonGap), row * 25)
+			item.button.Size = UDim2.fromOffset(compactButtonWidth, 22)
+		end
+		donateStatusLabel.Position = UDim2.new(0.28, 0, 0, 36)
+		donateStatusLabel.Size = UDim2.new(0.32, -12, 0, 56)
+	elseif isCompact then
 		controls.AnchorPoint = Vector2.new(0, 0)
 		controls.Position = UDim2.fromOffset(14, 120)
 		controls.Size = UDim2.new(1, -28, 0, 98)
@@ -738,8 +786,10 @@ local function layoutBoard()
 		return
 	end
 
-	local isCompact = rootSize.X < COMPACT_WIDTH or rootSize.Y > rootSize.X
-	local bottomHeight = if isCompact then COMPACT_BAR_HEIGHT else WIDE_BAR_HEIGHT
+	local isPortrait = rootSize.Y >= rootSize.X
+	local isCompact = rootSize.X < COMPACT_WIDTH or isPortrait
+	local isLandscapeCompact = isCompact and not isPortrait
+	local bottomHeight = if isLandscapeCompact then COMPACT_LANDSCAPE_BAR_HEIGHT else if isCompact then COMPACT_BAR_HEIGHT else WIDE_BAR_HEIGHT
 	local inset = GuiService:GetGuiInset()
 
 	boardOuter.Position = UDim2.fromOffset(0, inset.Y)
@@ -748,6 +798,11 @@ local function layoutBoard()
 	bottomBar.Size = UDim2.new(1, 0, 0, bottomHeight)
 	versionLabel.Position = UDim2.new(1, -12, 1, -(bottomHeight + 12))
 	zoomControls.Position = UDim2.new(1, -14, 0, inset.Y + 14)
+	zoomControls.Size = if isLandscapeCompact then UDim2.fromOffset(92, 42) else UDim2.fromOffset(116, 52)
+	zoomOutButton.Position = UDim2.fromOffset(0, 0)
+	zoomOutButton.Size = if isLandscapeCompact then UDim2.fromOffset(42, 42) else UDim2.fromOffset(52, 52)
+	zoomInButton.Position = if isLandscapeCompact then UDim2.fromOffset(50, 0) else UDim2.fromOffset(64, 0)
+	zoomInButton.Size = if isLandscapeCompact then UDim2.fromOffset(42, 42) else UDim2.fromOffset(52, 52)
 
 	currentCellSize = ZOOM_LEVELS[zoomIndex]
 	currentBoardWidth = (currentCellSize * COLUMNS) + (CELL_GAP * (COLUMNS - 1))
@@ -769,7 +824,7 @@ local function layoutBoard()
 		end
 	end
 
-	layoutControls(isCompact, rootSize.X)
+	layoutControls(isCompact, isLandscapeCompact, rootSize.X)
 end
 
 local function setZoom(nextZoomIndex)
