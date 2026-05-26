@@ -1,0 +1,60 @@
+name: Sync Game v2.4
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  patch-game-script:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch GameOfLife script
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/ReplicatedFirst/GameOfLife.client.lua")
+          text = path.read_text()
+          replacements = [
+              ('local UI_VERSION = "Life v2.3"', 'local UI_VERSION = "Life v2.4"'),
+              (
+                  'local DONATION_GOAL_ROBUX = 1000',
+                  'local DONATION_NET_TARGET_ROBUX = 1000\nlocal DONATION_CREATOR_SHARE = 0.7\nlocal DONATION_GOAL_ROBUX = math.ceil(DONATION_NET_TARGET_ROBUX / DONATION_CREATOR_SHARE)',
+              ),
+              (
+                  'donateBody = "Goal: 1000 Robux. When it is reached, I will cover the release fee to make this place available beyond the current 16+ limit."',
+                  'donateBody = "Goal: 1429 Robux donated. After Roblox\'s 30% fee, that is about 1000 Robux for the release fee to make this place available beyond the current 16+ limit."',
+              ),
+              (
+                  'donateBody = "Цель: 1000 Robux. Когда цель будет собрана, я оплачу комиссию релиза, чтобы открыть плейс не только для 16+."',
+                  'donateBody = "Цель: 1429 Robux донатов. После комиссии Roblox 30% это примерно 1000 Robux на комиссию релиза, чтобы открыть плейс не только для 16+."',
+              ),
+          ]
+
+          for old, new in replacements:
+              if old not in text:
+                  print(f"Already patched or missing: {old[:80]}")
+                  continue
+              text = text.replace(old, new, 1)
+
+          path.write_text(text)
+          PY
+
+      - name: Commit patch and remove temporary workflow
+        run: |
+          git rm --ignore-unmatch .github/workflows/sync-game-v24.yml
+          git add src/ReplicatedFirst/GameOfLife.client.lua
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Update game script donation target"
+          git push
