@@ -32,8 +32,13 @@ try {
     printExportResult(result.backup);
 
     if (result.changes.displayInfo) console.log("Updated display name/description.");
+    if (result.changes.universeSettings) console.log("Updated universe experience settings.");
+    if (result.changes.rootPlaceSettings) console.log("Updated root place settings.");
     if (result.changes.icon) console.log("Uploaded game icon.");
     if (result.changes.thumbnails) console.log("Uploaded game thumbnails.");
+    for (const field of result.unsupported ?? []) {
+      console.log(`WARN ${field} is tracked in metadata config but is not supported by the current Open Cloud sync.`);
+    }
     if (!result.changed) console.log("No filled metadata fields to update.");
   } else {
     usage();
