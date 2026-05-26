@@ -295,19 +295,35 @@ export async function applyMetadata({ rootDir = process.cwd() } = {}) {
   if (!String(config.universeId || "").trim()) throw new Error("metadata/roblox-metadata.json must include universeId.");
 
   const backup = await exportMetadata({ rootDir, config });
-  const universeSettings = await updateUniverseExperienceSettings(config);
+  const warnings = [];
   const changes = {
     displayInfo: await updatePlaceDisplayInfo(config),
     icon: await updateGameIcon(config, { rootDir }),
     thumbnails: await uploadGameThumbnails(config, { rootDir }),
-    universeSettings: universeSettings.changed,
-    rootPlaceSettings: await updateRootPlaceExperienceSettings(config)
+    universeSettings: false,
+    rootPlaceSettings: false
   };
+
+  let unsupported = [];
+  try {
+    const universeSettings = await updateUniverseExperienceSettings(config);
+    changes.universeSettings = universeSettings.changed;
+    unsupported = universeSettings.unsupported;
+  } catch (error) {
+    warnings.push(`Universe experience settings were not applied: ${error.message}`);
+  }
+
+  try {
+    changes.rootPlaceSettings = await updateRootPlaceExperienceSettings(config);
+  } catch (error) {
+    warnings.push(`Root place settings were not applied: ${error.message}`);
+  }
 
   return {
     backup,
     changes,
-    unsupported: universeSettings.unsupported,
+    unsupported,
+    warnings,
     changed: Object.values(changes).some(Boolean)
   };
 }
