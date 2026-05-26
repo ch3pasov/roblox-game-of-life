@@ -11,7 +11,7 @@ local Workspace = game:GetService("Workspace")
 
 local player = Players.LocalPlayer
 
-local UI_VERSION = "Life v2.3"
+local UI_VERSION = "Life v2.4"
 
 local ROWS = 64
 local COLUMNS = 64
@@ -20,7 +20,9 @@ local CELL_GAP = 1
 local RANDOM_FILL_CHANCE = 0.25
 local DEFAULT_ZOOM_INDEX = 3
 local ZOOM_LEVELS = { 9, 13, 17, 23, 31 }
-local DONATION_GOAL_ROBUX = 1000
+local DONATION_NET_TARGET_ROBUX = 1000
+local DONATION_CREATOR_SHARE = 0.7
+local DONATION_GOAL_ROBUX = math.ceil(DONATION_NET_TARGET_ROBUX / DONATION_CREATOR_SHARE)
 local DONATION_PRODUCTS = {
 	{ amount = 10, productId = 3598501584 },
 	{ amount = 50, productId = 3598501592 },
@@ -135,7 +137,7 @@ local TEXT = {
 		beacon = "Beacon",
 		spaceship = "Ship",
 		donateTitle = "Open for everyone",
-		donateBody = "Goal: 1000 Robux. When it is reached, I will cover the release fee to make this place available beyond the current 16+ limit.",
+		donateBody = "Goal: 1429 Robux donated. After Roblox's 30% fee, that is about 1000 Robux for the release fee to make this place available beyond the current 16+ limit.",
 		donateProgress = "%d / %d Robux",
 		donateButton = "%d R$",
 		donateSetup = "Donation product is not connected yet.",
@@ -165,7 +167,7 @@ local TEXT = {
 		beacon = "Маяк",
 		spaceship = "Корабль",
 		donateTitle = "Открыть для всех",
-		donateBody = "Цель: 1000 Robux. Когда цель будет собрана, я оплачу комиссию релиза, чтобы открыть плейс не только для 16+.",
+		donateBody = "Цель: 1429 Robux донатов. После комиссии Roblox 30% это примерно 1000 Robux на комиссию релиза, чтобы открыть плейс не только для 16+.",
 		donateProgress = "%d / %d Robux",
 		donateButton = "%d R$",
 		donateSetup = "Донат-продукт пока не подключен.",
