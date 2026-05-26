@@ -99,6 +99,9 @@ export async function exportMetadata({ rootDir = process.cwd(), config = null } 
   const auth = optionalAuthHeaders ? { headers: optionalAuthHeaders } : null;
   const exports = [
     tryExport("Open Cloud universe", `https://apis.roblox.com/cloud/v2/universes/${universeId}`, outDir, "open-cloud-universe.json", auth),
+    metadata.placeId
+      ? tryExport("Open Cloud root place", `https://apis.roblox.com/cloud/v2/universes/${universeId}/places/${metadata.placeId}`, outDir, "open-cloud-root-place.json", auth)
+      : Promise.resolve({ label: "Open Cloud root place", ok: false, skipped: true, error: "Skipped because placeId is missing." }),
     tryExport("Public game details", `https://games.roblox.com/v1/games?universeIds=${universeId}`, outDir, "public-game-details.json"),
     tryExport("Public game media", `https://games.roblox.com/v1/games/${universeId}/media`, outDir, "public-game-media.json"),
     tryExport("Public game media legacy", `https://games.roblox.com/v2/games/${universeId}/media`, outDir, "public-game-media-v2.json"),
@@ -203,20 +206,108 @@ export async function uploadGameThumbnails(config, { rootDir = process.cwd() } =
   return true;
 }
 
+function filledKeys(payload) {
+  return Object.entries(payload)
+    .filter(([, value]) => value !== undefined)
+    .map(([key]) => key);
+}
+
+function socialLinkPayload(value) {
+  if (value === undefined) return undefined;
+  if (value === null) return undefined;
+  if (typeof value === "string") {
+    const uri = value.trim();
+    return uri ? { title: "", uri } : undefined;
+  }
+  if (typeof value === "object") {
+    const title = String(value.title ?? "").trim();
+    const uri = String(value.uri ?? value.url ?? "").trim();
+    return uri ? { title, uri } : undefined;
+  }
+  return undefined;
+}
+
+export async function updateUniverseExperienceSettings(config) {
+  const settings = config.experienceSettings ?? {};
+  const universeId = String(config.universeId || "").trim();
+  if (!universeId) throw new Error("universeId is required before updating experience settings.");
+
+  const devices = settings.devices ?? {};
+  const socialLinks = settings.socialLinks ?? {};
+  const payload = {
+    visibility: settings.visibility,
+    voiceChatEnabled: settings.voiceChatEnabled,
+    privateServerPriceRobux: settings.privateServerPriceRobux,
+    desktopEnabled: devices.desktop,
+    mobileEnabled: devices.mobile,
+    tabletEnabled: devices.tablet,
+    consoleEnabled: devices.console,
+    vrEnabled: devices.vr,
+    facebookSocialLink: socialLinkPayload(socialLinks.facebook),
+    twitterSocialLink: socialLinkPayload(socialLinks.twitter),
+    youtubeSocialLink: socialLinkPayload(socialLinks.youtube),
+    twitchSocialLink: socialLinkPayload(socialLinks.twitch),
+    discordSocialLink: socialLinkPayload(socialLinks.discord),
+    robloxGroupSocialLink: socialLinkPayload(socialLinks.robloxGroup)
+  };
+
+  const updateMask = filledKeys(payload);
+  if (updateMask.length === 0) return { changed: false, unsupported: [] };
+
+  await robloxRequest("Update universe experience settings", `https://apis.roblox.com/cloud/v2/universes/${universeId}?updateMask=${encodeURIComponent(updateMask.join(","))}`, {
+    method: "PATCH",
+    headers: apiHeaders({ "content-type": "application/json" }),
+    body: JSON.stringify(payload)
+  });
+
+  const unsupported = [];
+  if (settings.dashboardOnly?.genre !== undefined) unsupported.push("experienceSettings.dashboardOnly.genre");
+  if (settings.dashboardOnly?.cameraEnabled !== undefined) unsupported.push("experienceSettings.dashboardOnly.cameraEnabled");
+  if (settings.dashboardOnly?.contentMaturity !== undefined) unsupported.push("experienceSettings.dashboardOnly.contentMaturity");
+
+  return { changed: true, unsupported };
+}
+
+export async function updateRootPlaceExperienceSettings(config) {
+  const placeSettings = config.experienceSettings?.place ?? {};
+  const universeId = String(config.universeId || "").trim();
+  const placeId = String(config.placeId || "").trim();
+  if (!universeId) throw new Error("universeId is required before updating root place settings.");
+  if (!placeId) throw new Error("placeId is required before updating root place settings.");
+
+  const payload = {
+    serverSize: placeSettings.serverSize
+  };
+  const updateMask = filledKeys(payload);
+  if (updateMask.length === 0) return false;
+
+  await robloxRequest("Update root place experience settings", `https://apis.roblox.com/cloud/v2/universes/${universeId}/places/${placeId}?updateMask=${encodeURIComponent(updateMask.join(","))}`, {
+    method: "PATCH",
+    headers: apiHeaders({ "content-type": "application/json" }),
+    body: JSON.stringify(payload)
+  });
+
+  return true;
+}
+
 export async function applyMetadata({ rootDir = process.cwd() } = {}) {
   const config = await loadRobloxConfig(path.join(rootDir, "metadata", "roblox-metadata.json"));
   if (!String(config.universeId || "").trim()) throw new Error("metadata/roblox-metadata.json must include universeId.");
 
   const backup = await exportMetadata({ rootDir, config });
+  const universeSettings = await updateUniverseExperienceSettings(config);
   const changes = {
     displayInfo: await updatePlaceDisplayInfo(config),
     icon: await updateGameIcon(config, { rootDir }),
-    thumbnails: await uploadGameThumbnails(config, { rootDir })
+    thumbnails: await uploadGameThumbnails(config, { rootDir }),
+    universeSettings: universeSettings.changed,
+    rootPlaceSettings: await updateRootPlaceExperienceSettings(config)
   };
 
   return {
     backup,
     changes,
+    unsupported: universeSettings.unsupported,
     changed: Object.values(changes).some(Boolean)
   };
 }
