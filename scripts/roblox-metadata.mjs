@@ -39,6 +39,9 @@ try {
     for (const field of result.unsupported ?? []) {
       console.log(`WARN ${field} is tracked in metadata config but is not supported by the current Open Cloud sync.`);
     }
+    for (const warning of result.warnings ?? []) {
+      console.log(`WARN ${warning}`);
+    }
     if (!result.changed) console.log("No filled metadata fields to update.");
   } else {
     usage();
