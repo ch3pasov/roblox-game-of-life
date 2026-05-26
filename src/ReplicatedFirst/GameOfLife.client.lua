@@ -6,11 +6,12 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local SoundService = game:GetService("SoundService")
 local StarterGui = game:GetService("StarterGui")
+local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
 local player = Players.LocalPlayer
 
-local UI_VERSION = "Life v2.2"
+local UI_VERSION = "Life v2.3"
 
 local ROWS = 64
 local COLUMNS = 64
@@ -119,6 +120,8 @@ local TEXT = {
 		clear = "Clear",
 		random = "Random",
 		pattern = "Pattern",
+		modeMove = "Move",
+		modeDraw = "Draw",
 		zoomIn = "+",
 		zoomOut = "-",
 		generation = "Generation %d",
@@ -147,6 +150,8 @@ local TEXT = {
 		clear = "Очистить",
 		random = "Случайно",
 		pattern = "Паттерн",
+		modeMove = "Двигать",
+		modeDraw = "Рисовать",
 		zoomIn = "+",
 		zoomOut = "-",
 		generation = "Поколение %d",
@@ -302,6 +307,11 @@ local currentBoardWidth = 0
 local currentBoardHeight = 0
 local activeTab = "game"
 local donationTotalRobux = 0
+local inputMode = "move"
+local drawingActive = false
+local drawTargetAlive = nil
+local drawInput = nil
+local lastPaintedCellKey = nil
 
 local playerGui = player:WaitForChild("PlayerGui")
 removeOldGui(playerGui)
@@ -444,7 +454,8 @@ local clearButton = makeButton("ClearButton")
 local randomButton = makeButton("RandomButton")
 local patternButton = makeButton("PatternButton")
 local speedButton = makeButton("SpeedButton")
-local buttons = { startButton, nextButton, clearButton, randomButton, patternButton, speedButton }
+local modeButton = makeButton("ModeButton")
+local buttons = { startButton, nextButton, clearButton, randomButton, patternButton, speedButton, modeButton }
 
 local zoomOutButton = makeButton("ZoomOutButton", zoomControls)
 zoomOutButton.Position = UDim2.fromOffset(0, 0)
@@ -557,6 +568,8 @@ local function updateLabels()
 	randomButton.Text = t.random
 	patternButton.Text = if lastPatternKey then t[lastPatternKey] else t.pattern
 	speedButton.Text = t[SPEEDS[speedIndex].key]
+	modeButton.Text = if inputMode == "draw" then t.modeDraw else t.modeMove
+	modeButton.BackgroundColor3 = if inputMode == "draw" then COLORS.buttonActive else COLORS.button
 	zoomOutButton.Text = t.zoomOut
 	zoomInButton.Text = t.zoomIn
 	gameTabButton.Text = t.gameTab
@@ -783,6 +796,113 @@ local function toggleCell(row, column)
 	setCell(row, column, not grid[row][column])
 end
 
+local function isTouchDevice()
+	return UserInputService.TouchEnabled and not UserInputService.MouseEnabled
+end
+
+local function syncBoardScrolling()
+	boardOuter.ScrollingEnabled = inputMode == "move" or not isTouchDevice()
+end
+
+local function cellAtScreenPosition(screenPosition)
+	local boardPosition = board.AbsolutePosition
+	local localX = screenPosition.X - boardPosition.X
+	local localY = screenPosition.Y - boardPosition.Y
+
+	if localX < 0 or localY < 0 or localX >= currentBoardWidth or localY >= currentBoardHeight then
+		return nil, nil
+	end
+
+	local stepSize = currentCellSize + CELL_GAP
+	local column = math.floor(localX / stepSize) + 1
+	local row = math.floor(localY / stepSize) + 1
+	if row < 1 or row > ROWS or column < 1 or column > COLUMNS then
+		return nil, nil
+	end
+
+	return row, column
+end
+
+local function paintCellAt(screenPosition)
+	if inputMode ~= "draw" then
+		return false
+	end
+
+	local row, column = cellAtScreenPosition(screenPosition)
+	if not row then
+		return false
+	end
+
+	local cellKey = row .. ":" .. column
+	if cellKey == lastPaintedCellKey then
+		return true
+	end
+
+	if drawTargetAlive == nil then
+		drawTargetAlive = not grid[row][column]
+	end
+
+	setCell(row, column, drawTargetAlive)
+	lastPaintedCellKey = cellKey
+	return true
+end
+
+local function beginDrawing(input)
+	if inputMode ~= "draw" then
+		return
+	end
+
+	if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then
+		return
+	end
+
+	local row, column = cellAtScreenPosition(input.Position)
+	if not row then
+		return
+	end
+
+	drawingActive = true
+	drawInput = input
+	drawTargetAlive = not grid[row][column]
+	lastPaintedCellKey = row .. ":" .. column
+	setCell(row, column, drawTargetAlive)
+end
+
+local function continueDrawing(input)
+	if not drawingActive or inputMode ~= "draw" then
+		return
+	end
+
+	if drawInput and input.UserInputType == Enum.UserInputType.Touch and input ~= drawInput then
+		return
+	end
+
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		paintCellAt(input.Position)
+	end
+end
+
+local function endDrawing(input)
+	if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input ~= drawInput then
+		return
+	end
+
+	drawingActive = false
+	drawInput = nil
+	drawTargetAlive = nil
+	lastPaintedCellKey = nil
+end
+
+local function setInputMode(nextMode)
+	inputMode = nextMode
+	drawingActive = false
+	drawInput = nil
+	drawTargetAlive = nil
+	lastPaintedCellKey = nil
+	syncBoardScrolling()
+	updateLabels()
+end
+
 local function layoutControls(isCompact, isLandscapeCompact, rootWidth)
 	local gap = if isCompact then 10 else 16
 	local buttonHeight = if isLandscapeCompact then 34 else if isCompact then 44 else 54
@@ -808,11 +928,12 @@ local function layoutControls(isCompact, isLandscapeCompact, rootWidth)
 		controls.Position = UDim2.fromOffset(270, 12)
 		controls.Size = UDim2.new(1, -284, 0, 92)
 		local controlsWidth = rootWidth - 284
-		local buttonWidth = math.floor((controlsWidth - (gap * 2)) / 3)
+		local buttonWidth = math.floor((controlsWidth - (gap * 3)) / 4)
 		local positions = {
 			{ 0, 0, buttonWidth },
 			{ buttonWidth + gap, 0, buttonWidth },
 			{ (buttonWidth + gap) * 2, 0, buttonWidth },
+			{ (buttonWidth + gap) * 3, 0, buttonWidth },
 			{ 0, buttonHeight + gap, buttonWidth },
 			{ buttonWidth + gap, buttonHeight + gap, buttonWidth },
 			{ (buttonWidth + gap) * 2, buttonHeight + gap, buttonWidth },
@@ -850,11 +971,12 @@ local function layoutControls(isCompact, isLandscapeCompact, rootWidth)
 		controls.Position = UDim2.fromOffset(14, 120)
 		controls.Size = UDim2.new(1, -28, 0, 98)
 		local controlsWidth = rootWidth - 28
-		local buttonWidth = math.floor((controlsWidth - (gap * 2)) / 3)
+		local buttonWidth = math.floor((controlsWidth - (gap * 3)) / 4)
 		local positions = {
 			{ 0, 0, buttonWidth },
 			{ buttonWidth + gap, 0, buttonWidth },
 			{ (buttonWidth + gap) * 2, 0, buttonWidth },
+			{ (buttonWidth + gap) * 3, 0, buttonWidth },
 			{ 0, buttonHeight + gap, buttonWidth },
 			{ buttonWidth + gap, buttonHeight + gap, buttonWidth },
 			{ (buttonWidth + gap) * 2, buttonHeight + gap, buttonWidth },
@@ -885,11 +1007,11 @@ local function layoutControls(isCompact, isLandscapeCompact, rootWidth)
 		donateStatusLabel.Position = UDim2.fromOffset(0, 162)
 		donateStatusLabel.Size = UDim2.new(1, 0, 0, 34)
 	else
-		local controlsWidth = 852
+		local controlsWidth = 1008
 		controls.AnchorPoint = Vector2.new(0.5, 0.5)
 		controls.Position = UDim2.fromScale(0.61, 0.62)
 		controls.Size = UDim2.fromOffset(controlsWidth, buttonHeight)
-		local widths = { 136, 112, 132, 150, 140, 142 }
+		local widths = { 136, 112, 132, 150, 140, 142, 140 }
 		local x = 0
 		for index, button in buttons do
 			button.Position = UDim2.fromOffset(x, 0)
@@ -1005,10 +1127,6 @@ for row = 1, ROWS do
 		cell.Text = ""
 		cell.Parent = board
 		cells[row][column] = cell
-
-		cell.Activated:Connect(function()
-			toggleCell(row, column)
-		end)
 	end
 end
 
@@ -1042,6 +1160,9 @@ clearButton.Activated:Connect(clearGrid)
 randomButton.Activated:Connect(randomizeGrid)
 patternButton.Activated:Connect(placePattern)
 speedButton.Activated:Connect(cycleSpeed)
+modeButton.Activated:Connect(function()
+	setInputMode(if inputMode == "draw" then "move" else "draw")
+end)
 zoomOutButton.Activated:Connect(function()
 	setZoom(zoomIndex - 1)
 end)
@@ -1049,12 +1170,18 @@ zoomInButton.Activated:Connect(function()
 	setZoom(zoomIndex + 1)
 end)
 
+UserInputService.InputBegan:Connect(beginDrawing)
+UserInputService.InputChanged:Connect(continueDrawing)
+UserInputService.InputEnded:Connect(endDrawing)
+UserInputService.LastInputTypeChanged:Connect(syncBoardScrolling)
+
 root:GetPropertyChangedSignal("AbsoluteSize"):Connect(layoutBoard)
 boardOuter:GetPropertyChangedSignal("AbsoluteSize"):Connect(layoutBoard)
 
 bindDonationTotal()
 pollDonationTotal()
 setActiveTab("game")
+syncBoardScrolling()
 layoutBoard()
 renderGrid()
 
