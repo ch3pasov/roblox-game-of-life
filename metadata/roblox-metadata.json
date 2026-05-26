@@ -3,7 +3,35 @@
   "placeId": "125341913379113",
   "languageCode": "en",
   "displayName": "Life Grid",
-  "description": "Build living patterns on a big scrolling grid, then watch them evolve.\n\nLife Grid is a simple 2D version of Conway's Game of Life made for Roblox. Tap cells to create a pattern, zoom in or out, move around the board, and start the simulation to see what survives.\n\nFeatures:\n- Large 64x64 scrolling board\n- Zoom controls for easier mobile play\n- Start, pause, and step one generation at a time\n- Clear, random, and classic pattern buttons\n- Adjustable simulation speed\n- Donate tab with small Robux amounts toward a 1000 Robux release goal",
+  "description": "Build living patterns on a big scrolling grid, then watch them evolve.\n\nLife Grid is a simple 2D version of Conway's Game of Life made for Roblox. Tap cells to create a pattern, zoom in or out, move around the board, and start the simulation to see what survives.\n\nFeatures:\n- Large 64x64 scrolling board\n- Zoom controls for easier mobile play\n- Start, pause, and step one generation at a time\n- Clear, random, and classic pattern buttons\n- Adjustable simulation speed\n- Donate tab with small Robux amounts toward a 1429 Robux donation goal, about 1000 Robux after Roblox fees",
+  "experienceSettings": {
+    "visibility": "PUBLIC",
+    "voiceChatEnabled": false,
+    "privateServerPriceRobux": 0,
+    "devices": {
+      "desktop": true,
+      "mobile": true,
+      "tablet": true,
+      "console": false,
+      "vr": true
+    },
+    "socialLinks": {
+      "facebook": null,
+      "twitter": null,
+      "youtube": null,
+      "twitch": null,
+      "discord": null,
+      "robloxGroup": null
+    },
+    "place": {
+      "serverSize": 2
+    },
+    "dashboardOnly": {
+      "genre": "Education",
+      "cameraEnabled": false,
+      "contentMaturity": "Minimal"
+    }
+  },
   "iconPath": "",
   "thumbnails": []
 }
