@@ -22,7 +22,7 @@ function productName(price) {
 }
 
 function productDescription(price) {
-  return `Donate ${price} Robux toward opening Life Grid for everyone. At 1000 Robux donated, the release fee will be covered.`;
+  return `Donate ${price} Robux toward opening Life Grid for everyone. At 1429 Robux donated, about 1000 Robux remains after Roblox fees for the release fee.`;
 }
 
 function usage() {
