@@ -234,7 +234,7 @@ export async function updateUniverseExperienceSettings(config) {
 
   const devices = settings.devices ?? {};
   const socialLinks = settings.socialLinks ?? {};
-  const payload = {
+  const fields = {
     visibility: settings.visibility,
     voiceChatEnabled: settings.voiceChatEnabled,
     privateServerPriceRobux: settings.privateServerPriceRobux,
@@ -251,21 +251,30 @@ export async function updateUniverseExperienceSettings(config) {
     robloxGroupSocialLink: socialLinkPayload(socialLinks.robloxGroup)
   };
 
-  const updateMask = filledKeys(payload);
-  if (updateMask.length === 0) return { changed: false, unsupported: [] };
+  const updateMask = filledKeys(fields);
+  if (updateMask.length === 0) return { changed: false, unsupported: [], warnings: [] };
 
-  await robloxRequest("Update universe experience settings", `https://apis.roblox.com/cloud/v2/universes/${universeId}?updateMask=${encodeURIComponent(updateMask.join(","))}`, {
-    method: "PATCH",
-    headers: apiHeaders({ "content-type": "application/json" }),
-    body: JSON.stringify(payload)
-  });
+  let changed = false;
+  const warnings = [];
+  for (const key of updateMask) {
+    try {
+      await robloxRequest(`Update universe experience setting ${key}`, `https://apis.roblox.com/cloud/v2/universes/${universeId}?updateMask=${encodeURIComponent(key)}`, {
+        method: "PATCH",
+        headers: apiHeaders({ "content-type": "application/json" }),
+        body: JSON.stringify({ [key]: fields[key] })
+      });
+      changed = true;
+    } catch (error) {
+      warnings.push(`${key} was not applied: ${error.message}`);
+    }
+  }
 
   const unsupported = [];
   if (settings.dashboardOnly?.genre !== undefined) unsupported.push("experienceSettings.dashboardOnly.genre");
   if (settings.dashboardOnly?.cameraEnabled !== undefined) unsupported.push("experienceSettings.dashboardOnly.cameraEnabled");
   if (settings.dashboardOnly?.contentMaturity !== undefined) unsupported.push("experienceSettings.dashboardOnly.contentMaturity");
 
-  return { changed: true, unsupported };
+  return { changed, unsupported, warnings };
 }
 
 export async function updateRootPlaceExperienceSettings(config) {
@@ -309,6 +318,7 @@ export async function applyMetadata({ rootDir = process.cwd() } = {}) {
     const universeSettings = await updateUniverseExperienceSettings(config);
     changes.universeSettings = universeSettings.changed;
     unsupported = universeSettings.unsupported;
+    warnings.push(...(universeSettings.warnings ?? []));
   } catch (error) {
     warnings.push(`Universe experience settings were not applied: ${error.message}`);
   }
