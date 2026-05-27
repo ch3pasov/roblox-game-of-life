@@ -1,0 +1,188 @@
+diff --git a/.gitignore b/.gitignore
+index 589cdef..e1c6827 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -7,3 +7,5 @@ metadata/exported/
+ *.rbxlx
+ *.rbxm
+ *.rbxmx
++
++.codex/
+diff --git a/future-features.md b/future-features.md
+index 8f1a3fa..4ed77b9 100644
+--- a/future-features.md
++++ b/future-features.md
+@@ -1,4 +1,15 @@
+ # Future Features
+ 
+-Add future feature requests here as they come up.
++## Done locally, needs Roblox/manual verification
+ 
++- Disable social runtime UI: default Roblox chat and default voice setup are disabled from the client script.
++- Fix field movement in Move mode: mouse drag now pans the board.
++- Make Draw the default mode at game start.
++- Prevent overlay controls from painting cells underneath them in Draw mode.
++
++## Needs platform/API verification
++
++- Confirm Roblox dashboard settings after CI deploy:
++  - Voice Chat should be disabled.
++  - Camera should be disabled if Roblox Open Cloud exposes a supported field for it.
++  - Server size should be 2.
+diff --git a/src/ReplicatedFirst/GameOfLife.client.lua b/src/ReplicatedFirst/GameOfLife.client.lua
+index 2a9efe2..a32821d 100644
+--- a/src/ReplicatedFirst/GameOfLife.client.lua
++++ b/src/ReplicatedFirst/GameOfLife.client.lua
+@@ -6,12 +6,14 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
+ local RunService = game:GetService("RunService")
+ local SoundService = game:GetService("SoundService")
+ local StarterGui = game:GetService("StarterGui")
++local TextChatService = game:GetService("TextChatService")
+ local UserInputService = game:GetService("UserInputService")
++local VoiceChatService = game:GetService("VoiceChatService")
+ local Workspace = game:GetService("Workspace")
+ 
+ local player = Players.LocalPlayer
+ 
+-local UI_VERSION = "Life v2.4"
++local UI_VERSION = "Life v2.5"
+ 
+ local ROWS = 64
+ local COLUMNS = 64
+@@ -181,6 +183,17 @@ pcall(function()
+ 	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, false)
+ end)
+ 
++pcall(function()
++	TextChatService.CreateDefaultCommands = false
++	TextChatService.CreateDefaultTextChannels = false
++	TextChatService.ChatWindowConfiguration.Enabled = false
++	TextChatService.ChatInputBarConfiguration.Enabled = false
++end)
++
++pcall(function()
++	VoiceChatService.EnableDefaultVoice = false
++end)
++
+ local function muteSound(instance)
+ 	if instance:IsA("Sound") then
+ 		pcall(function()
+@@ -309,11 +322,14 @@ local currentBoardWidth = 0
+ local currentBoardHeight = 0
+ local activeTab = "game"
+ local donationTotalRobux = 0
+-local inputMode = "move"
++local inputMode = "draw"
+ local drawingActive = false
+ local drawTargetAlive = nil
+ local drawInput = nil
+ local lastPaintedCellKey = nil
++local panningActive = false
++local panStartPosition = nil
++local panStartCanvasPosition = nil
+ 
+ local playerGui = player:WaitForChild("PlayerGui")
+ removeOldGui(playerGui)
+@@ -806,7 +822,30 @@ local function syncBoardScrolling()
+ 	boardOuter.ScrollingEnabled = inputMode == "move" or not isTouchDevice()
+ end
+ 
++local function isBoardInputPosition(screenPosition)
++	local guiObjects = playerGui:GetGuiObjectsAtPosition(screenPosition.X, screenPosition.Y)
++	for _, guiObject in guiObjects do
++		if guiObject == board or guiObject:IsDescendantOf(board) then
++			return true
++		end
++
++		if guiObject == boardOuter then
++			return true
++		end
++
++		if guiObject == root or guiObject:IsDescendantOf(root) then
++			return false
++		end
++	end
++
++	return false
++end
++
+ local function cellAtScreenPosition(screenPosition)
++	if not isBoardInputPosition(screenPosition) then
++		return nil, nil
++	end
++
+ 	local boardPosition = board.AbsolutePosition
+ 	local localX = screenPosition.X - boardPosition.X
+ 	local localY = screenPosition.Y - boardPosition.Y
+@@ -895,12 +934,59 @@ local function endDrawing(input)
+ 	lastPaintedCellKey = nil
+ end
+ 
++local function beginPanning(input)
++	if inputMode ~= "move" then
++		return
++	end
++
++	if input.UserInputType ~= Enum.UserInputType.MouseButton1 then
++		return
++	end
++
++	if not isBoardInputPosition(input.Position) then
++		return
++	end
++
++	panningActive = true
++	panStartPosition = input.Position
++	panStartCanvasPosition = boardOuter.CanvasPosition
++end
++
++local function continuePanning(input)
++	if not panningActive or input.UserInputType ~= Enum.UserInputType.MouseMovement then
++		return
++	end
++
++	local delta = input.Position - panStartPosition
++	local canvasSize = boardOuter.AbsoluteCanvasSize
++	local viewSize = boardOuter.AbsoluteSize
++	local maxX = math.max(0, canvasSize.X - viewSize.X)
++	local maxY = math.max(0, canvasSize.Y - viewSize.Y)
++	boardOuter.CanvasPosition = Vector2.new(
++		math.clamp(panStartCanvasPosition.X - delta.X, 0, maxX),
++		math.clamp(panStartCanvasPosition.Y - delta.Y, 0, maxY)
++	)
++end
++
++local function endPanning(input)
++	if input.UserInputType ~= Enum.UserInputType.MouseButton1 then
++		return
++	end
++
++	panningActive = false
++	panStartPosition = nil
++	panStartCanvasPosition = nil
++end
++
+ local function setInputMode(nextMode)
+ 	inputMode = nextMode
+ 	drawingActive = false
+ 	drawInput = nil
+ 	drawTargetAlive = nil
+ 	lastPaintedCellKey = nil
++	panningActive = false
++	panStartPosition = nil
++	panStartCanvasPosition = nil
+ 	syncBoardScrolling()
+ 	updateLabels()
+ end
+@@ -1173,8 +1259,11 @@ zoomInButton.Activated:Connect(function()
+ end)
+ 
+ UserInputService.InputBegan:Connect(beginDrawing)
++UserInputService.InputBegan:Connect(beginPanning)
+ UserInputService.InputChanged:Connect(continueDrawing)
++UserInputService.InputChanged:Connect(continuePanning)
+ UserInputService.InputEnded:Connect(endDrawing)
++UserInputService.InputEnded:Connect(endPanning)
+ UserInputService.LastInputTypeChanged:Connect(syncBoardScrolling)
+ 
+ root:GetPropertyChangedSignal("AbsoluteSize"):Connect(layoutBoard)
