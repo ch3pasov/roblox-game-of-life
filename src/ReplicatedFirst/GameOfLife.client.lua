@@ -13,7 +13,7 @@ local Workspace = game:GetService("Workspace")
 
 local player = Players.LocalPlayer
 
-local UI_VERSION = "Life v2.5"
+local UI_VERSION = "Life v2.6"
 
 local ROWS = 64
 local COLUMNS = 64
