@@ -8,6 +8,7 @@ This project can export and update Roblox experience metadata through Roblox Ope
 2. Give the key access to experience `10205453994`.
 3. Add these permissions where available:
    - `universe:read`
+   - `universe:write`
    - `universe.place:write`
    - `universe-places:write`
    - `asset:read`
