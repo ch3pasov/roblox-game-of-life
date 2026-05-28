@@ -21,6 +21,7 @@ local BOARD_MARGIN = 14
 local CELL_GAP = 1
 local RANDOM_FILL_CHANCE = 0.25
 local DEFAULT_ZOOM_INDEX = 3
+local PATTERN_FOCUS_ZOOM_INDEX = 4
 local ZOOM_LEVELS = { 9, 13, 17, 23, 31 }
 local DONATION_NET_TARGET_ROBUX = 1000
 local DONATION_CREATOR_SHARE = 0.7
@@ -791,6 +792,7 @@ local function placePattern()
 		patternIndex = 1
 	end
 	renderGrid()
+	return startRow + (maxRow / 2), startColumn + (maxColumn / 2)
 end
 
 local function cycleSpeed()
@@ -1204,6 +1206,24 @@ local function setZoom(nextZoomIndex)
 	end)
 end
 
+local function centerBoardOnCell(row, column)
+	task.defer(function()
+		local stepSize = currentCellSize + CELL_GAP
+		local targetX = board.Position.X.Offset + ((column - 1) * stepSize) + (currentCellSize / 2) - (boardOuter.AbsoluteSize.X / 2)
+		local targetY = board.Position.Y.Offset + ((row - 1) * stepSize) + (currentCellSize / 2) - (boardOuter.AbsoluteSize.Y / 2)
+		local maxX = math.max(0, boardOuter.AbsoluteCanvasSize.X - boardOuter.AbsoluteSize.X)
+		local maxY = math.max(0, boardOuter.AbsoluteCanvasSize.Y - boardOuter.AbsoluteSize.Y)
+		boardOuter.CanvasPosition = Vector2.new(math.clamp(targetX, 0, maxX), math.clamp(targetY, 0, maxY))
+	end)
+end
+
+local function focusPlacedPattern(row, column)
+	zoomIndex = math.clamp(PATTERN_FOCUS_ZOOM_INDEX, 1, #ZOOM_LEVELS)
+	layoutBoard()
+	updateLabels()
+	centerBoardOnCell(row, column)
+end
+
 for row = 1, ROWS do
 	cells[row] = {}
 	for column = 1, COLUMNS do
@@ -1246,7 +1266,10 @@ end)
 
 clearButton.Activated:Connect(clearGrid)
 randomButton.Activated:Connect(randomizeGrid)
-patternButton.Activated:Connect(placePattern)
+patternButton.Activated:Connect(function()
+	local row, column = placePattern()
+	focusPlacedPattern(row, column)
+end)
 speedButton.Activated:Connect(cycleSpeed)
 modeButton.Activated:Connect(function()
 	setInputMode(if inputMode == "draw" then "move" else "draw")
