@@ -1,113 +1,65 @@
-# Roblox Game of Life
+# Life Grid
 
-2D-прототип Conway's Game of Life для Roblox Studio.
+[![Roblox Deploy](https://github.com/ch3pasov/roblox-game-of-life/actions/workflows/roblox-deploy.yml/badge.svg)](https://github.com/ch3pasov/roblox-game-of-life/actions/workflows/roblox-deploy.yml)
 
-В игре есть большое прокручиваемое поле с клетками и нижняя панель управления:
+A touch-first Conway's Game of Life built as a Roblox experience.
 
-- `Start` запускает и останавливает симуляцию.
-- `Next` делает один шаг симуляции.
-- `Clear` очищает поле.
-- `Random` случайно заполняет поле.
-- `Pattern` вставляет классические стартовые фигуры по центру поля.
-- Кнопка скорости переключает `Slow`, `Normal` и `Fast`.
-- Кнопки `+` и `-` меняют масштаб поля.
-- Клик или тап по клетке включает или выключает ее вручную.
-- На телефоне поле можно двигать пальцем, поэтому игра удобнее в вертикальном формате.
-- На мобильных игра принудительно использует вертикальную ориентацию.
-- Вкладка `Donate` показывает прогресс цели `1429 Robux` донатов и предлагает донаты на `10`, `50`, `100`, `250` или `1000 Robux`.
+[Play Life Grid on Roblox](https://www.roblox.com/games/125341913379113/Life-Grid) · [View the deployment workflow](https://github.com/ch3pasov/roblox-game-of-life/actions/workflows/roblox-deploy.yml)
 
-Интерфейс автоматически переключается между русским и английским языком по локали Roblox.
+Life Grid turns a 64×64 cellular automaton into a mobile-friendly Roblox interface. Players can draw directly on the board, pan and zoom, place classic patterns, and watch each generation evolve.
 
-## Как запустить через Rojo
+## Features
 
-1. Откройте Roblox Studio.
-2. Откройте или создайте пустой place.
-3. Запустите Rojo из этой папки:
+- Start, pause, or advance the simulation one generation at a time.
+- Clear the board, randomize it, or cycle through classic starting patterns.
+- Switch between slow, normal, and fast simulation speeds.
+- Pan and zoom a large scrolling board with mouse or touch controls.
+- Use a portrait-first layout on phones, with responsive desktop support.
+- Automatically select the English or Russian interface from the Roblox locale.
+- Process optional Robux donations with Developer Products and show shared progress from DataStore.
+
+## How it is built
+
+The simulation and interface live in one client-side Luau module. Server code validates donation receipts and stores the aggregate donation total. Rojo maps the source tree into a Roblox place, while Node.js scripts handle Open Cloud metadata, Developer Products, DataStore reads, and place publishing.
+
+```text
+src/ReplicatedFirst/       simulation and interface
+src/ServerScriptService/   server bootstrap and receipt processing
+metadata/                  desired Roblox experience settings
+scripts/                   build, metadata, product, and deployment tools
+default.project.json       Rojo project map
+```
+
+## Run in Roblox Studio
+
+1. Open or create an empty place in Roblox Studio.
+2. Start Rojo from this repository:
 
    ```sh
    rojo serve
    ```
 
-4. В Roblox Studio подключитесь через Rojo plugin.
-5. Нажмите Play. На экране появится 2D-поле Game of Life.
+3. Connect with the Rojo Studio plugin.
+4. Press **Play**.
 
-Если Rojo еще не установлен, его можно поставить с официальной страницы: https://rojo.space/
-
-## Автодеплой в Roblox
-
-Скрипт `scripts/roblox-publish.mjs` собирает place-файл через Rojo и может опубликовать его в Roblox.
-
-Проверить сборку без публикации:
+To build a place file without publishing it:
 
 ```sh
 node scripts/roblox-publish.mjs build
 ```
 
-Собрать и опубликовать новую версию:
+## Deployment
+
+The GitHub Actions workflow checks the Node.js scripts, installs Rojo, validates the project map, builds a `.rbxl` place, and uploads it as an artifact. On pushes to `main`, it also synchronizes supported experience metadata and Developer Products before publishing through Roblox Open Cloud.
+
+Authenticated commands read `ROBLOX_API_KEY` from a local `.env` file or a GitHub Actions secret. Start from `.env.example`; `.env` itself is ignored and must not be committed.
 
 ```sh
-node scripts/roblox-publish.mjs deploy
-```
-
-Скрипт берет `universeId` и `placeId` из `metadata/roblox-metadata.json`, а `ROBLOX_API_KEY` из `.env`.
-
-Настройки Roblox experience тоже лежат в `metadata/roblox-metadata.json` в блоке `experienceSettings`.
-При деплое GitHub Actions синхронизирует:
-
-- видимость experience;
-- voice chat;
-- доступные платформы;
-- цену private servers;
-- social links;
-- размер сервера root place.
-
-`Genre`, `Camera` и `Content Maturity` пока лежат в `experienceSettings.dashboardOnly` как желаемое состояние для ручной сверки: текущий Open Cloud sync не умеет применять эти поля API-ключом.
-
-Полезные команды Roblox API:
-
-```sh
+node scripts/roblox-metadata.mjs export
 node scripts/roblox-metadata.mjs apply
-node scripts/roblox-publish.mjs deploy
 node scripts/roblox-donation-product.mjs ensure
 node scripts/roblox-donation-total.mjs
+node scripts/roblox-publish.mjs deploy
 ```
 
-Общая обертка над Roblox Open Cloud лежит в `scripts/lib/roblox-open-cloud.mjs`.
-
-## GitHub Actions deploy
-
-В репозитории есть workflow `.github/workflows/roblox-deploy.yml`.
-
-Он делает:
-
-- проверку Node.js-скриптов;
-- установку Rojo на GitHub runner;
-- `rojo sourcemap`;
-- сборку `build/game-of-life.rbxl`;
-- загрузку `.rbxl` как GitHub Actions artifact;
-- на push в `main` применяет Roblox metadata, проверяет донатные продукты и публикует place.
-
-Чтобы деплой в Roblox работал из GitHub, добавь secret:
-
-`Settings -> Secrets and variables -> Actions -> New repository secret`
-
-Имя:
-
-```text
-ROBLOX_API_KEY
-```
-
-Значение: Roblox Open Cloud API key с теми же правами, что лежит локально в `.env`.
-
-## Донат-продукт
-
-Developer Product для цели доната:
-
-- `10 Robux`: `3598501584`
-- `50 Robux`: `3598501592`
-- `100 Robux`: `3598501597`
-- `250 Robux`: `3598501604`
-- `1000 Robux`: `3598443222`
-- Назначение: собрать `1429 Robux` донатов. После комиссии Roblox 30% это примерно `1000 Robux` для оплаты комиссии релиза и открытия плейса для всех.
-
-Покупки обрабатываются серверным скриптом `DonationReceipts` и увеличивают общий прогресс в DataStore `LifeGridDonations`.
+More details about the Open Cloud setup are in [`docs/roblox-metadata.md`](docs/roblox-metadata.md).
