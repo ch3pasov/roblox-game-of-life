@@ -89,7 +89,7 @@ Shared Roblox Open Cloud helpers live in `scripts/lib/roblox-open-cloud.mjs`.
 
 The repository includes `.github/workflows/roblox-deploy.yml`.
 
-The workflow runs on pull requests and pushes. On every run it:
+The workflow runs on pull requests and pushes to `main`, and it can also be started manually. On every run it:
 
 - installs Rojo;
 - checks the Node.js scripts;
@@ -97,7 +97,7 @@ The workflow runs on pull requests and pushes. On every run it:
 - builds `build/game-of-life.rbxl`;
 - uploads the place file as an artifact.
 
-On push to `main`, if the repository secret `ROBLOX_API_KEY` is present, it also:
+On a manually dispatched run, if the repository secret `ROBLOX_API_KEY` is present, it also:
 
 - applies Roblox metadata;
 - ensures donation products;

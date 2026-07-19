@@ -1,10 +1,10 @@
 # Life Grid
 
-[![Roblox Deploy](https://github.com/ch3pasov/roblox-game-of-life/actions/workflows/roblox-deploy.yml/badge.svg)](https://github.com/ch3pasov/roblox-game-of-life/actions/workflows/roblox-deploy.yml)
+[![Roblox Build](https://github.com/ch3pasov/roblox-game-of-life/actions/workflows/roblox-deploy.yml/badge.svg)](https://github.com/ch3pasov/roblox-game-of-life/actions/workflows/roblox-deploy.yml)
 
 A touch-first Conway's Game of Life built as a Roblox experience.
 
-[Play Life Grid on Roblox](https://www.roblox.com/games/125341913379113/Life-Grid) · [View the deployment workflow](https://github.com/ch3pasov/roblox-game-of-life/actions/workflows/roblox-deploy.yml)
+[Play Life Grid on Roblox](https://www.roblox.com/games/125341913379113/Life-Grid) · [View the build workflow](https://github.com/ch3pasov/roblox-game-of-life/actions/workflows/roblox-deploy.yml)
 
 Life Grid turns a 64×64 cellular automaton into a mobile-friendly Roblox interface. Players can draw directly on the board, pan and zoom, place classic patterns, and watch each generation evolve.
 
@@ -50,9 +50,11 @@ node scripts/roblox-publish.mjs build
 
 ## Deployment
 
-The GitHub Actions workflow checks the Node.js scripts, installs Rojo, validates the project map, builds a `.rbxl` place, and uploads it as an artifact. On pushes to `main`, it also synchronizes supported experience metadata and Developer Products before publishing through Roblox Open Cloud.
+The GitHub Actions workflow runs for pull requests and pushes to `main`. It checks the Node.js scripts, installs Rojo, validates the project map, builds a `.rbxl` place, and uploads it as an artifact.
 
-Authenticated commands read `ROBLOX_API_KEY` from a local `.env` file or a GitHub Actions secret. Start from `.env.example`; `.env` itself is ignored and must not be committed.
+Deployment is deliberately manual: a manually dispatched workflow run can synchronize supported experience metadata and Developer Products, then publish through Roblox Open Cloud. Builds and checks do not need an API key.
+
+Authenticated commands read `ROBLOX_API_KEY` from a local `.env` file or an optional GitHub Actions secret. Start from `.env.example`; `.env` itself is ignored and must not be committed.
 
 ```sh
 node scripts/roblox-metadata.mjs export
