@@ -22,34 +22,11 @@ jobs:
         with:
           node-version: "24"
 
-      - name: Install Rojo
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/rojo"
-          ASSET_URL="$(node <<'NODE'
-          const release = await fetch("https://api.github.com/repos/rojo-rbx/rojo/releases/latest").then((response) => response.json());
-          const asset = release.assets.find((item) => /linux/i.test(item.name) && /x86_64|amd64/i.test(item.name) && item.name.endsWith(".zip"));
-          if (!asset) {
-            console.error("Could not find a Linux x86_64 Rojo release asset.");
-            process.exit(1);
-          }
-          console.log(asset.browser_download_url);
-          NODE
-          )"
-          curl -L "$ASSET_URL" -o "$RUNNER_TEMP/rojo/rojo.zip"
-          unzip -q "$RUNNER_TEMP/rojo/rojo.zip" -d "$RUNNER_TEMP/rojo"
-          ROJO_BIN="$(find "$RUNNER_TEMP/rojo" -type f -name rojo | head -n 1)"
-          if [ -z "$ROJO_BIN" ]; then
-            echo "Rojo binary was not found after unzip."
-            find "$RUNNER_TEMP/rojo" -maxdepth 3 -type f
-            exit 1
-          fi
-          chmod +x "$ROJO_BIN"
-          if [ "$ROJO_BIN" != "$RUNNER_TEMP/rojo/rojo" ]; then
-            ln -sf "$ROJO_BIN" "$RUNNER_TEMP/rojo/rojo"
-          fi
-          echo "$RUNNER_TEMP/rojo" >> "$GITHUB_PATH"
+      - name: Test Rojo installer offline
+        run: node --test scripts/test-install-rojo.mjs
+
+      - name: Install verified Rojo
+        run: bash scripts/install-rojo.sh
 
       - name: Check scripts
         run: |

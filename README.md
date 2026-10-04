@@ -52,6 +52,18 @@ node scripts/roblox-publish.mjs build
 
 The GitHub Actions workflow runs for pull requests and pushes to `main`. It checks the Node.js scripts, installs Rojo, validates the project map, builds a `.rbxl` place, and uploads it as an artifact.
 
+CI uses the pinned Rojo 7.7.1 Linux x86_64 release. `scripts/install-rojo.sh`
+checks the archive's fixed SHA-256 before extraction and adds it to the runner
+path only after installation succeeds. Updating Rojo requires reviewing both the
+release version and digest against the official `rojo-rbx/rojo` release.
+
+Installer checks run offline with synthetic downloads and controlled command
+stubs, without a Roblox API key:
+
+```sh
+node --test scripts/test-install-rojo.mjs
+```
+
 Deployment is deliberately manual: a manually dispatched workflow run can synchronize supported experience metadata and Developer Products, then publish through Roblox Open Cloud. Builds and checks do not need an API key.
 
 Authenticated commands read `ROBLOX_API_KEY` from a local `.env` file or an optional GitHub Actions secret. Start from `.env.example`; `.env` itself is ignored and must not be committed.
